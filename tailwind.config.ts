@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['Outfit', 'sans-serif'],
+        body: ['Space Grotesk', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -57,6 +61,15 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        discord: {
+          blurple: "hsl(var(--discord-blurple))",
+          green: "hsl(var(--discord-green))",
+          yellow: "hsl(var(--discord-yellow))",
+          red: "hsl(var(--discord-red))",
+          dark: "hsl(var(--discord-dark))",
+          darker: "hsl(var(--discord-darker))",
+          grey: "hsl(var(--discord-grey))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +78,22 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 20px 0px hsl(235 86% 65% / 0.3)" },
+          "50%": { boxShadow: "0 0 30px 5px hsl(235 86% 65% / 0.5)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
     },
   },
