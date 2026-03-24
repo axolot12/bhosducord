@@ -197,10 +197,20 @@ export const useServerMembers = (serverId: string | null) => {
       if (!serverId) return [];
       const { data, error } = await supabase
         .from("server_members")
-        .select("*, profiles!server_members_user_id_fkey(username, display_name, avatar_url, status)")
+        .select("*")
         .eq("server_id", serverId);
       if (error) throw error;
-      return data;
+
+      const userIds = (data || []).map((m: any) => m.user_id);
+      const { data: profiles } = userIds.length > 0
+        ? await supabase.from("profiles").select("user_id, username, display_name, avatar_url, status").in("user_id", userIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+
+      return (data || []).map((m: any) => ({
+        ...m,
+        profiles: profileMap.get(m.user_id) || null,
+      }));
     },
     enabled: !!serverId,
   });
