@@ -64,7 +64,7 @@ export const useFriendships = () => {
       // Fetch profiles for all friends
       const userIds = data.flatMap((f: any) => [f.requester_id, f.addressee_id]).filter((id: string) => id !== user.id);
       const uniqueIds = [...new Set(userIds)];
-      if (uniqueIds.length === 0) return data;
+      if (uniqueIds.length === 0) return data.map((f: any) => ({ ...f, profile: null })) as Friendship[];
 
       const { data: profiles } = await supabase
         .from("profiles")
