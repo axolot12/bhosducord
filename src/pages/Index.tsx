@@ -1,14 +1,65 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
+import { useServers, useChannels, type Server, type Channel } from "@/hooks/useServer";
+import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Hash, Volume2, Settings, Plus, ChevronDown, MessageSquare, Users, Compass } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, ChevronDown, MessageSquare, Users, Compass, Telescope } from "lucide-react";
+import { CreateServerDialog } from "@/components/ServerDialog";
+import { ChatArea } from "@/components/ChatArea";
+import { DmChatArea } from "@/components/DmChatArea";
+import { FriendsView } from "@/components/FriendsView";
+import logoImg from "@/assets/logo.png";
+
+type View = "server" | "friends" | "dm";
 
 const Index = () => {
   const { user, loading } = useAuth();
   const { profile } = useProfile();
+  const { servers, isLoading: serversLoading } = useServers();
+  const { conversations } = useDmConversations();
   const navigate = useNavigate();
+
+  const [view, setView] = useState<View>("friends");
+  const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  const [selectedDm, setSelectedDm] = useState<DmConversation | null>(null);
+  const [showServerDialog, setShowServerDialog] = useState(false);
+
+  const { data: channels } = useChannels(selectedServerId);
+  const selectedServer = servers.find((s) => s.id === selectedServerId);
+  const textChannels = (channels || []).filter((c) => c.type === "text" || c.type === "announcement");
+  const voiceChannels = (channels || []).filter((c) => c.type === "voice");
+  const selectedChannel = (channels || []).find((c) => c.id === selectedChannelId);
+
+  // Auto-select first channel when server changes
+  useEffect(() => {
+    if (textChannels.length > 0 && !selectedChannelId) {
+      setSelectedChannelId(textChannels[0].id);
+    }
+  }, [channels]);
+
+  const handleSelectServer = (server: Server) => {
+    setView("server");
+    setSelectedServerId(server.id);
+    setSelectedChannelId(null);
+    setSelectedDm(null);
+  };
+
+  const handleHome = () => {
+    setView("friends");
+    setSelectedServerId(null);
+    setSelectedChannelId(null);
+    setSelectedDm(null);
+  };
+
+  const handleOpenDm = (conv: DmConversation) => {
+    setView("dm");
+    setSelectedDm(conv);
+    setSelectedServerId(null);
+    setSelectedChannelId(null);
+  };
 
   if (loading) {
     return (
@@ -23,7 +74,7 @@ const Index = () => {
     return null;
   }
 
-  const statusColor = {
+  const statusColor: Record<string, string> = {
     online: "bg-discord-green",
     idle: "bg-discord-yellow",
     dnd: "bg-discord-red",
@@ -34,22 +85,46 @@ const Index = () => {
   return (
     <div className="flex h-screen bg-background">
       {/* Server List */}
-      <div className="flex w-[72px] flex-shrink-0 flex-col items-center gap-2 bg-discord-darker py-3">
+      <div className="flex w-[72px] flex-shrink-0 flex-col items-center gap-2 overflow-y-auto bg-discord-darker py-3">
         {/* Home */}
-        <button className="group relative flex h-12 w-12 items-center justify-center rounded-2xl bg-primary transition-all hover:rounded-xl">
-          <MessageSquare className="h-6 w-6 text-primary-foreground" />
+        <button
+          onClick={handleHome}
+          className={`group relative flex h-12 w-12 items-center justify-center transition-all ${
+            view === "friends" ? "rounded-xl bg-primary" : "rounded-2xl bg-secondary hover:rounded-xl hover:bg-primary"
+          }`}
+        >
+          <img src={logoImg} alt="Home" className="h-7 w-7" width={28} height={28} />
         </button>
         <div className="mx-auto h-0.5 w-8 rounded-full bg-border" />
-        {/* Placeholder servers */}
-        {["G", "D", "M"].map((letter, i) => (
+
+        {/* Servers */}
+        {servers.map((server) => (
           <button
-            key={i}
-            className="flex h-12 w-12 items-center justify-center rounded-[24px] bg-secondary font-display text-sm font-bold text-secondary-foreground transition-all hover:rounded-xl hover:bg-primary hover:text-primary-foreground"
+            key={server.id}
+            onClick={() => handleSelectServer(server)}
+            title={server.name}
+            className={`group relative flex h-12 w-12 items-center justify-center font-display text-sm font-bold transition-all ${
+              selectedServerId === server.id
+                ? "rounded-xl bg-primary text-primary-foreground"
+                : "rounded-[24px] bg-secondary text-secondary-foreground hover:rounded-xl hover:bg-primary hover:text-primary-foreground"
+            }`}
           >
-            {letter}
+            {server.icon_url ? (
+              <img src={server.icon_url} alt={server.name} className="h-full w-full rounded-inherit object-cover" />
+            ) : (
+              server.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+            )}
+            {/* Pill indicator */}
+            {selectedServerId === server.id && (
+              <div className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-foreground" />
+            )}
           </button>
         ))}
-        <button className="flex h-12 w-12 items-center justify-center rounded-[24px] bg-secondary text-discord-green transition-all hover:rounded-xl hover:bg-discord-green hover:text-primary-foreground">
+
+        <button
+          onClick={() => setShowServerDialog(true)}
+          className="flex h-12 w-12 items-center justify-center rounded-[24px] bg-secondary text-discord-green transition-all hover:rounded-xl hover:bg-discord-green hover:text-primary-foreground"
+        >
           <Plus className="h-5 w-5" />
         </button>
         <button className="flex h-12 w-12 items-center justify-center rounded-[24px] bg-secondary text-discord-green transition-all hover:rounded-xl hover:bg-discord-green hover:text-primary-foreground">
@@ -57,47 +132,116 @@ const Index = () => {
         </button>
       </div>
 
-      {/* Channel Sidebar */}
+      {/* Channel/DM Sidebar */}
       <div className="flex w-60 flex-shrink-0 flex-col bg-discord-dark">
-        {/* Server Header */}
-        <button className="flex h-12 items-center justify-between border-b border-border px-4 font-display font-semibold text-foreground hover:bg-muted/50">
-          <span>My Server</span>
-          <ChevronDown className="h-4 w-4" />
-        </button>
+        {view === "server" && selectedServer ? (
+          <>
+            {/* Server Header */}
+            <button className="flex h-12 items-center justify-between border-b border-border px-4 font-display font-semibold text-foreground hover:bg-muted/50">
+              <span className="truncate">{selectedServer.name}</span>
+              <ChevronDown className="h-4 w-4 flex-shrink-0" />
+            </button>
 
-        {/* Channels */}
-        <div className="flex-1 overflow-auto p-2">
-          <div className="mb-1">
-            <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
-              <ChevronDown className="h-3 w-3" />
-              Text Channels
-            </button>
-            {["general", "off-topic", "announcements"].map((ch) => (
+            {/* Channels */}
+            <div className="flex-1 overflow-auto p-2">
+              {textChannels.length > 0 && (
+                <div className="mb-1">
+                  <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
+                    <ChevronDown className="h-3 w-3" />
+                    Text Channels
+                  </button>
+                  {textChannels.map((ch) => (
+                    <button
+                      key={ch.id}
+                      onClick={() => setSelectedChannelId(ch.id)}
+                      className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                        selectedChannelId === ch.id
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      }`}
+                    >
+                      <Hash className="h-4 w-4 flex-shrink-0" />
+                      {ch.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {voiceChannels.length > 0 && (
+                <div>
+                  <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
+                    <ChevronDown className="h-3 w-3" />
+                    Voice Channels
+                  </button>
+                  {voiceChannels.map((ch) => (
+                    <button
+                      key={ch.id}
+                      className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    >
+                      <Volume2 className="h-4 w-4 flex-shrink-0" />
+                      {ch.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Invite code */}
+              {selectedServer.invite_code && (
+                <div className="mt-4 rounded-lg bg-secondary/50 p-3">
+                  <p className="mb-1 text-xs font-bold uppercase text-muted-foreground">Invite Code</p>
+                  <p className="select-all font-mono text-xs text-foreground">{selectedServer.invite_code}</p>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* DM Header */}
+            <div className="flex h-12 items-center border-b border-border px-3">
+              <input
+                placeholder="Find or start a conversation"
+                className="w-full rounded-md bg-secondary px-2 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+            </div>
+
+            {/* DM list */}
+            <div className="flex-1 overflow-auto p-2">
               <button
-                key={ch}
-                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                onClick={() => { setView("friends"); setSelectedDm(null); }}
+                className={`mb-1 flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
+                  view === "friends" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`}
               >
-                <Hash className="h-4 w-4 flex-shrink-0" />
-                {ch}
+                <Users className="h-5 w-5" />
+                Friends
               </button>
-            ))}
-          </div>
-          <div>
-            <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
-              <ChevronDown className="h-3 w-3" />
-              Voice Channels
-            </button>
-            {["General", "Gaming"].map((ch) => (
-              <button
-                key={ch}
-                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              >
-                <Volume2 className="h-4 w-4 flex-shrink-0" />
-                {ch}
-              </button>
-            ))}
-          </div>
-        </div>
+
+              <p className="mb-1 mt-3 px-2 text-xs font-bold uppercase text-muted-foreground">
+                Direct Messages
+              </p>
+              {conversations.map((conv) => {
+                const other = conv.participants?.[0]?.profiles;
+                const name = other?.display_name || other?.username || "User";
+                return (
+                  <button
+                    key={conv.id}
+                    onClick={() => handleOpenDm(conv)}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                      selectedDm?.id === conv.id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={other?.avatar_url || ""} />
+                      <AvatarFallback className="bg-primary text-[10px] text-primary-foreground">
+                        {name[0]?.toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate">{name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {/* User Panel */}
         <div className="flex items-center gap-2 bg-discord-darker p-2">
@@ -124,64 +268,54 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex flex-1 flex-col">
-        {/* Channel Header */}
-        <div className="flex h-12 items-center gap-2 border-b border-border px-4">
-          <Hash className="h-5 w-5 text-muted-foreground" />
-          <span className="font-display font-semibold text-foreground">general</span>
-          <div className="mx-2 h-6 w-px bg-border" />
-          <span className="text-sm text-muted-foreground">Welcome to the server!</span>
-        </div>
+      {/* Main Content Area */}
+      {view === "server" ? (
+        <ChatArea channelId={selectedChannelId} channelName={selectedChannel?.name || "general"} />
+      ) : view === "dm" ? (
+        <DmChatArea conversation={selectedDm} />
+      ) : (
+        <FriendsView onOpenDm={handleOpenDm} />
+      )}
 
-        {/* Messages Area */}
-        <div className="flex flex-1 items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
-              <Hash className="h-8 w-8 text-muted-foreground" />
+      {/* Members Sidebar (only for server view) */}
+      {view === "server" && selectedServerId && (
+        <MembersSidebar serverId={selectedServerId} statusColor={statusColor} />
+      )}
+
+      <CreateServerDialog open={showServerDialog} onOpenChange={setShowServerDialog} />
+    </div>
+  );
+};
+
+// Members sidebar component
+import { useServerMembers } from "@/hooks/useServer";
+
+const MembersSidebar = ({ serverId, statusColor }: { serverId: string; statusColor: Record<string, string> }) => {
+  const { data: members } = useServerMembers(serverId);
+
+  return (
+    <div className="hidden w-60 flex-shrink-0 bg-discord-dark p-4 lg:block">
+      <h3 className="mb-2 text-xs font-bold uppercase text-muted-foreground">
+        <Users className="mr-1 inline h-3 w-3" /> Members — {(members || []).length}
+      </h3>
+      {(members || []).map((m: any) => {
+        const profile = m.profiles;
+        const name = profile?.display_name || profile?.username || "Unknown";
+        return (
+          <div key={m.id} className="flex items-center gap-2 rounded-md p-2 hover:bg-muted/50">
+            <div className="relative">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={profile?.avatar_url || ""} />
+                <AvatarFallback className="bg-primary text-xs text-primary-foreground">
+                  {name[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-dark ${statusColor[profile?.status || "offline"]}`} />
             </div>
-            <h2 className="font-display text-2xl font-bold text-foreground">
-              Welcome to #general
-            </h2>
-            <p className="mt-1 text-muted-foreground">
-              This is the beginning of the #general channel.
-            </p>
+            <span className="truncate text-sm text-foreground">{name}</span>
           </div>
-        </div>
-
-        {/* Message Input */}
-        <div className="p-4">
-          <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2.5">
-            <Plus className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Message #general"
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Members Sidebar */}
-      <div className="hidden w-60 flex-shrink-0 bg-discord-dark p-4 lg:block">
-        <h3 className="mb-2 text-xs font-bold uppercase text-muted-foreground">
-          <Users className="mr-1 inline h-3 w-3" /> Online — 1
-        </h3>
-        <div className="flex items-center gap-2 rounded-md p-2 hover:bg-muted/50">
-          <div className="relative">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={profile?.avatar_url || ""} />
-              <AvatarFallback className="bg-primary text-xs text-primary-foreground">
-                {(profile?.display_name || profile?.username || "?")[0].toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-dark ${statusColor[profile?.status || "offline"]}`} />
-          </div>
-          <span className="text-sm text-foreground">
-            {profile?.display_name || profile?.username}
-          </span>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 };
