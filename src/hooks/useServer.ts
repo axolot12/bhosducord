@@ -130,12 +130,23 @@ export const useMessages = (channelId: string | null) => {
       if (!channelId) return [];
       const { data, error } = await supabase
         .from("messages")
-        .select("*, profiles!messages_author_id_fkey(username, display_name, avatar_url, status)")
+        .select("*")
         .eq("channel_id", channelId)
         .order("created_at", { ascending: true })
         .limit(100);
       if (error) throw error;
-      return data as Message[];
+
+      // Fetch author profiles
+      const authorIds = [...new Set((data || []).map((m: any) => m.author_id))];
+      const { data: profiles } = authorIds.length > 0
+        ? await supabase.from("profiles").select("user_id, username, display_name, avatar_url, status").in("user_id", authorIds)
+        : { data: [] };
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+
+      return (data || []).map((m: any) => ({
+        ...m,
+        profiles: profileMap.get(m.author_id) || null,
+      })) as Message[];
     },
     enabled: !!channelId,
   });
