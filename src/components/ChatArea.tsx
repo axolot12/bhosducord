@@ -1,22 +1,43 @@
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Plus, Send } from "lucide-react";
+import { Hash, Plus, Send, Pin } from "lucide-react";
 import { useMessages, useSendMessage, type Message } from "@/hooks/useServer";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { MessageActions, ReactionDisplay } from "@/components/MessageActions";
+import { InviteEmbed, parseMessageContent } from "@/components/InviteEmbed";
 
 interface ChatAreaProps {
   channelId: string | null;
   channelName: string;
 }
 
-const MessageItem = ({ msg }: { msg: Message }) => {
+const BASE_URL = window.location.origin;
+
+const MessageContent = ({ content }: { content: string }) => {
+  const parts = parseMessageContent(content, BASE_URL);
+  return (
+    <div>
+      {parts.map((part, i) =>
+        part.type === "invite" ? (
+          <InviteEmbed key={i} inviteCode={part.value} />
+        ) : (
+          <span key={i} className="whitespace-pre-wrap break-words text-sm text-foreground/90">
+            {part.value}
+          </span>
+        )
+      )}
+    </div>
+  );
+};
+
+const MessageItem = ({ msg, onReply }: { msg: Message; onReply: (id: string) => void }) => {
   const profile = msg.profiles;
   const name = profile?.display_name || profile?.username || "Unknown";
   const initial = name[0]?.toUpperCase() || "?";
 
   return (
-    <div className="group flex gap-3 px-4 py-1 hover:bg-muted/30">
+    <div className="group relative flex gap-3 px-4 py-1 hover:bg-muted/30">
       <Avatar className="mt-0.5 h-10 w-10 flex-shrink-0">
         <AvatarImage src={profile?.avatar_url || ""} />
         <AvatarFallback className="bg-primary text-xs text-primary-foreground">{initial}</AvatarFallback>
@@ -27,9 +48,20 @@ const MessageItem = ({ msg }: { msg: Message }) => {
           <span className="text-xs text-muted-foreground">
             {format(new Date(msg.created_at), "MM/dd/yyyy h:mm a")}
           </span>
+          {msg.is_pinned && <Pin className="h-3 w-3 text-discord-yellow" />}
+          {msg.edited_at && <span className="text-[10px] text-muted-foreground">(edited)</span>}
         </div>
-        <p className="whitespace-pre-wrap break-words text-sm text-foreground/90">{msg.content}</p>
+        <MessageContent content={msg.content} />
+        <ReactionDisplay messageId={msg.id} />
       </div>
+      <MessageActions
+        messageId={msg.id}
+        authorId={msg.author_id}
+        content={msg.content}
+        isPinned={msg.is_pinned}
+        channelId={msg.channel_id}
+        onReply={onReply}
+      />
     </div>
   );
 };
@@ -38,8 +70,12 @@ export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
   const { messages, isLoading, subscribeToMessages } = useMessages(channelId);
   const sendMessage = useSendMessage();
   const [input, setInput] = useState("");
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const [showPinned, setShowPinned] = useState(false);
+
+  const pinnedMessages = messages.filter(m => m.is_pinned);
 
   useEffect(() => {
     if (channelId) {
@@ -57,6 +93,7 @@ export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
     if (!input.trim() || !channelId) return;
     const content = input.trim();
     setInput("");
+    setReplyTo(null);
     try {
       await sendMessage.mutateAsync({ channelId, content });
     } catch {
@@ -75,10 +112,38 @@ export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
   return (
     <div className="flex flex-1 flex-col">
       {/* Channel Header */}
-      <div className="flex h-12 items-center gap-2 border-b border-border px-4 shadow-sm">
-        <Hash className="h-5 w-5 text-muted-foreground" />
-        <span className="font-display font-semibold text-foreground">{channelName}</span>
+      <div className="flex h-12 items-center justify-between border-b border-border px-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Hash className="h-5 w-5 text-muted-foreground" />
+          <span className="font-display font-semibold text-foreground">{channelName}</span>
+        </div>
+        <button
+          onClick={() => setShowPinned(!showPinned)}
+          className={`rounded p-1.5 transition-colors ${showPinned ? "text-discord-yellow" : "text-muted-foreground hover:text-foreground"}`}
+          title="Pinned Messages"
+        >
+          <Pin className="h-4 w-4" />
+        </button>
       </div>
+
+      {/* Pinned sidebar */}
+      {showPinned && (
+        <div className="border-b border-border bg-card p-3">
+          <h4 className="mb-2 text-xs font-bold uppercase text-muted-foreground">
+            Pinned Messages — {pinnedMessages.length}
+          </h4>
+          {pinnedMessages.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No pinned messages</p>
+          ) : (
+            pinnedMessages.map(m => (
+              <div key={m.id} className="mb-1 rounded bg-secondary/50 p-2 text-sm text-foreground">
+                <span className="font-semibold">{m.profiles?.display_name || m.profiles?.username}: </span>
+                {m.content}
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4">
@@ -99,10 +164,20 @@ export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
             </p>
           </div>
         ) : (
-          messages.map((msg) => <MessageItem key={msg.id} msg={msg} />)
+          messages.map((msg) => (
+            <MessageItem key={msg.id} msg={msg} onReply={(id) => setReplyTo(id)} />
+          ))
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Reply indicator */}
+      {replyTo && (
+        <div className="flex items-center gap-2 border-t border-border bg-card px-4 py-1.5 text-xs text-muted-foreground">
+          <span>Replying to a message</span>
+          <button onClick={() => setReplyTo(null)} className="text-primary hover:underline">Cancel</button>
+        </div>
+      )}
 
       {/* Input */}
       <form onSubmit={handleSend} className="p-4">

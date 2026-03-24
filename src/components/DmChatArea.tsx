@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Plus } from "lucide-react";
+import { Send, Plus, Phone, Video } from "lucide-react";
 import { useDmMessages, useSendDmMessage, type DmConversation } from "@/hooks/useFriends";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { MessageActions, ReactionDisplay } from "@/components/MessageActions";
+import { InviteEmbed, parseMessageContent } from "@/components/InviteEmbed";
 
 interface DmChatAreaProps {
   conversation: DmConversation | null;
 }
+
+const BASE_URL = window.location.origin;
 
 export const DmChatArea = ({ conversation }: DmChatAreaProps) => {
   const convId = conversation?.id || null;
@@ -53,14 +57,24 @@ export const DmChatArea = ({ conversation }: DmChatAreaProps) => {
   return (
     <div className="flex flex-1 flex-col">
       {/* Header */}
-      <div className="flex h-12 items-center gap-2 border-b border-border px-4 shadow-sm">
-        <Avatar className="h-6 w-6">
-          <AvatarImage src={otherUser?.avatar_url || ""} />
-          <AvatarFallback className="bg-primary text-[10px] text-primary-foreground">
-            {displayName[0]?.toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <span className="font-display font-semibold text-foreground">{displayName}</span>
+      <div className="flex h-12 items-center justify-between border-b border-border px-4 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={otherUser?.avatar_url || ""} />
+            <AvatarFallback className="bg-primary text-[10px] text-primary-foreground">
+              {displayName[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-display font-semibold text-foreground">{displayName}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button className="rounded p-1.5 text-muted-foreground hover:text-foreground" title="Voice Call">
+            <Phone className="h-4 w-4" />
+          </button>
+          <button className="rounded p-1.5 text-muted-foreground hover:text-foreground" title="Video Call">
+            <Video className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -86,8 +100,9 @@ export const DmChatArea = ({ conversation }: DmChatAreaProps) => {
           messages.map((msg) => {
             const profile = msg.profiles;
             const name = profile?.display_name || profile?.username || "Unknown";
+            const parts = parseMessageContent(msg.content, BASE_URL);
             return (
-              <div key={msg.id} className="group flex gap-3 px-4 py-1 hover:bg-muted/30">
+              <div key={msg.id} className="group relative flex gap-3 px-4 py-1 hover:bg-muted/30">
                 <Avatar className="mt-0.5 h-10 w-10 flex-shrink-0">
                   <AvatarImage src={profile?.avatar_url || ""} />
                   <AvatarFallback className="bg-primary text-xs text-primary-foreground">
@@ -100,9 +115,29 @@ export const DmChatArea = ({ conversation }: DmChatAreaProps) => {
                     <span className="text-xs text-muted-foreground">
                       {format(new Date(msg.created_at), "MM/dd/yyyy h:mm a")}
                     </span>
+                    {msg.edited_at && <span className="text-[10px] text-muted-foreground">(edited)</span>}
                   </div>
-                  <p className="whitespace-pre-wrap break-words text-sm text-foreground/90">{msg.content}</p>
+                  <div>
+                    {parts.map((part, i) =>
+                      part.type === "invite" ? (
+                        <InviteEmbed key={i} inviteCode={part.value} />
+                      ) : (
+                        <span key={i} className="whitespace-pre-wrap break-words text-sm text-foreground/90">
+                          {part.value}
+                        </span>
+                      )
+                    )}
+                  </div>
+                  <ReactionDisplay messageId={msg.id} isDm />
                 </div>
+                <MessageActions
+                  messageId={msg.id}
+                  authorId={msg.author_id}
+                  content={msg.content}
+                  isPinned={false}
+                  conversationId={msg.conversation_id}
+                  isDm
+                />
               </div>
             );
           })
