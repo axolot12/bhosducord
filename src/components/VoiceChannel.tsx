@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Mic, MicOff, Headphones, HeadphonesOff, Monitor, PhoneOff, Video, VideoOff,
+  Mic, MicOff, Headphones, HeadphoneOff, Monitor, PhoneOff, Video, VideoOff,
   Settings, Signal
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -63,7 +63,7 @@ export const VoiceControls = ({ channelName, onDisconnect }: VoiceChannelProps) 
           }`}
           title={deafened ? "Undeafen" : "Deafen"}
         >
-          {deafened ? <HeadphonesOff className="h-4 w-4" /> : <Headphones className="h-4 w-4" />}
+          {deafened ? <HeadphoneOff className="h-4 w-4" /> : <Headphones className="h-4 w-4" />}
         </button>
 
         <button
