@@ -1,18 +1,20 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
-import { useServers, useChannels, type Server, type Channel } from "@/hooks/useServer";
+import { useServers, useChannels, useServerMembers, type Server, type Channel } from "@/hooks/useServer";
 import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Volume2, Settings, Plus, ChevronDown, MessageSquare, Users, Compass, Telescope } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy } from "lucide-react";
 import { CreateServerDialog } from "@/components/ServerDialog";
 import { ChatArea } from "@/components/ChatArea";
 import { DmChatArea } from "@/components/DmChatArea";
 import { FriendsView } from "@/components/FriendsView";
+import { VoiceControls, VoiceChannelView } from "@/components/VoiceChannel";
+import { toast } from "sonner";
 import logoImg from "@/assets/logo.png";
 
-type View = "server" | "friends" | "dm";
+type View = "server" | "friends" | "dm" | "voice";
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -26,6 +28,7 @@ const Index = () => {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [selectedDm, setSelectedDm] = useState<DmConversation | null>(null);
   const [showServerDialog, setShowServerDialog] = useState(false);
+  const [voiceChannel, setVoiceChannel] = useState<{ id: string; name: string } | null>(null);
 
   const { data: channels } = useChannels(selectedServerId);
   const selectedServer = servers.find((s) => s.id === selectedServerId);
@@ -33,7 +36,6 @@ const Index = () => {
   const voiceChannels = (channels || []).filter((c) => c.type === "voice");
   const selectedChannel = (channels || []).find((c) => c.id === selectedChannelId);
 
-  // Auto-select first channel when server changes
   useEffect(() => {
     if (textChannels.length > 0 && !selectedChannelId) {
       setSelectedChannelId(textChannels[0].id);
@@ -61,6 +63,17 @@ const Index = () => {
     setSelectedChannelId(null);
   };
 
+  const handleJoinVoice = (ch: Channel) => {
+    setVoiceChannel({ id: ch.id, name: ch.name });
+    setView("voice");
+  };
+
+  const handleCopyInvite = (code: string) => {
+    const url = `${window.location.origin}/invite/${code}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Invite link copied!");
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -86,18 +99,16 @@ const Index = () => {
     <div className="flex h-screen bg-background">
       {/* Server List */}
       <div className="flex w-[72px] flex-shrink-0 flex-col items-center gap-2 overflow-y-auto bg-discord-darker py-3">
-        {/* Home */}
         <button
           onClick={handleHome}
           className={`group relative flex h-12 w-12 items-center justify-center transition-all ${
-            view === "friends" ? "rounded-xl bg-primary" : "rounded-2xl bg-secondary hover:rounded-xl hover:bg-primary"
+            view === "friends" || view === "dm" ? "rounded-xl bg-primary" : "rounded-2xl bg-secondary hover:rounded-xl hover:bg-primary"
           }`}
         >
           <img src={logoImg} alt="Home" className="h-7 w-7" width={28} height={28} />
         </button>
         <div className="mx-auto h-0.5 w-8 rounded-full bg-border" />
 
-        {/* Servers */}
         {servers.map((server) => (
           <button
             key={server.id}
@@ -114,7 +125,6 @@ const Index = () => {
             ) : (
               server.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
             )}
-            {/* Pill indicator */}
             {selectedServerId === server.id && (
               <div className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-foreground" />
             )}
@@ -127,75 +137,89 @@ const Index = () => {
         >
           <Plus className="h-5 w-5" />
         </button>
-        <button className="flex h-12 w-12 items-center justify-center rounded-[24px] bg-secondary text-discord-green transition-all hover:rounded-xl hover:bg-discord-green hover:text-primary-foreground">
+        <button
+          onClick={() => navigate("/discovery")}
+          className="flex h-12 w-12 items-center justify-center rounded-[24px] bg-secondary text-discord-green transition-all hover:rounded-xl hover:bg-discord-green hover:text-primary-foreground"
+        >
           <Compass className="h-5 w-5" />
         </button>
       </div>
 
       {/* Channel/DM Sidebar */}
       <div className="flex w-60 flex-shrink-0 flex-col bg-discord-dark">
-        {view === "server" && selectedServer ? (
-          <>
-            {/* Server Header */}
-            <button className="flex h-12 items-center justify-between border-b border-border px-4 font-display font-semibold text-foreground hover:bg-muted/50">
-              <span className="truncate">{selectedServer.name}</span>
-              <ChevronDown className="h-4 w-4 flex-shrink-0" />
-            </button>
+        {view === "server" || view === "voice" ? (
+          selectedServer ? (
+            <>
+              <button className="flex h-12 items-center justify-between border-b border-border px-4 font-display font-semibold text-foreground hover:bg-muted/50">
+                <span className="truncate">{selectedServer.name}</span>
+                <ChevronDown className="h-4 w-4 flex-shrink-0" />
+              </button>
 
-            {/* Channels */}
-            <div className="flex-1 overflow-auto p-2">
-              {textChannels.length > 0 && (
-                <div className="mb-1">
-                  <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
-                    <ChevronDown className="h-3 w-3" />
-                    Text Channels
-                  </button>
-                  {textChannels.map((ch) => (
-                    <button
-                      key={ch.id}
-                      onClick={() => setSelectedChannelId(ch.id)}
-                      className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                        selectedChannelId === ch.id
-                          ? "bg-muted text-foreground"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                      }`}
-                    >
-                      <Hash className="h-4 w-4 flex-shrink-0" />
-                      {ch.name}
+              <div className="flex-1 overflow-auto p-2">
+                {textChannels.length > 0 && (
+                  <div className="mb-1">
+                    <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
+                      <ChevronDown className="h-3 w-3" /> Text Channels
                     </button>
-                  ))}
-                </div>
-              )}
-              {voiceChannels.length > 0 && (
-                <div>
-                  <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
-                    <ChevronDown className="h-3 w-3" />
-                    Voice Channels
-                  </button>
-                  {voiceChannels.map((ch) => (
-                    <button
-                      key={ch.id}
-                      className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    >
-                      <Volume2 className="h-4 w-4 flex-shrink-0" />
-                      {ch.name}
+                    {textChannels.map((ch) => (
+                      <button
+                        key={ch.id}
+                        onClick={() => { setSelectedChannelId(ch.id); setView("server"); }}
+                        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                          selectedChannelId === ch.id && view === "server"
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <Hash className="h-4 w-4 flex-shrink-0" />
+                        {ch.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {voiceChannels.length > 0 && (
+                  <div>
+                    <button className="flex w-full items-center gap-1 px-1 py-1 text-xs font-bold uppercase text-muted-foreground hover:text-foreground">
+                      <ChevronDown className="h-3 w-3" /> Voice Channels
                     </button>
-                  ))}
-                </div>
-              )}
+                    {voiceChannels.map((ch) => (
+                      <button
+                        key={ch.id}
+                        onClick={() => handleJoinVoice(ch)}
+                        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                          voiceChannel?.id === ch.id
+                            ? "bg-muted text-foreground"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        }`}
+                      >
+                        <Volume2 className="h-4 w-4 flex-shrink-0" />
+                        {ch.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-              {/* Invite code */}
-              {selectedServer.invite_code && (
-                <div className="mt-4 rounded-lg bg-secondary/50 p-3">
-                  <p className="mb-1 text-xs font-bold uppercase text-muted-foreground">Invite Code</p>
-                  <p className="select-all font-mono text-xs text-foreground">{selectedServer.invite_code}</p>
-                </div>
-              )}
-            </div>
-          </>
+                {selectedServer.invite_code && (
+                  <div className="mt-4 rounded-lg bg-secondary/50 p-3">
+                    <p className="mb-1 text-xs font-bold uppercase text-muted-foreground">Invite Link</p>
+                    <div className="flex items-center gap-2">
+                      <p className="flex-1 truncate font-mono text-xs text-foreground">
+                        /invite/{selectedServer.invite_code}
+                      </p>
+                      <button
+                        onClick={() => handleCopyInvite(selectedServer.invite_code)}
+                        className="rounded p-1 text-muted-foreground hover:text-foreground"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : null
         ) : (
           <>
-            {/* DM Header */}
             <div className="flex h-12 items-center border-b border-border px-3">
               <input
                 placeholder="Find or start a conversation"
@@ -203,7 +227,6 @@ const Index = () => {
               />
             </div>
 
-            {/* DM list */}
             <div className="flex-1 overflow-auto p-2">
               <button
                 onClick={() => { setView("friends"); setSelectedDm(null); }}
@@ -211,8 +234,7 @@ const Index = () => {
                   view === "friends" ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 }`}
               >
-                <Users className="h-5 w-5" />
-                Friends
+                <Users className="h-5 w-5" /> Friends
               </button>
 
               <p className="mb-1 mt-3 px-2 text-xs font-bold uppercase text-muted-foreground">
@@ -243,6 +265,14 @@ const Index = () => {
           </>
         )}
 
+        {/* Voice controls */}
+        {voiceChannel && (
+          <VoiceControls
+            channelName={voiceChannel.name}
+            onDisconnect={() => { setVoiceChannel(null); if (view === "voice") setView("server"); }}
+          />
+        )}
+
         {/* User Panel */}
         <div className="flex items-center gap-2 bg-discord-darker p-2">
           <div className="relative">
@@ -269,7 +299,9 @@ const Index = () => {
       </div>
 
       {/* Main Content Area */}
-      {view === "server" ? (
+      {view === "voice" ? (
+        <VoiceChannelView channelName={voiceChannel?.name || "Voice"} />
+      ) : view === "server" ? (
         <ChatArea channelId={selectedChannelId} channelName={selectedChannel?.name || "general"} />
       ) : view === "dm" ? (
         <DmChatArea conversation={selectedDm} />
@@ -277,8 +309,8 @@ const Index = () => {
         <FriendsView onOpenDm={handleOpenDm} />
       )}
 
-      {/* Members Sidebar (only for server view) */}
-      {view === "server" && selectedServerId && (
+      {/* Members Sidebar */}
+      {(view === "server" || view === "voice") && selectedServerId && (
         <MembersSidebar serverId={selectedServerId} statusColor={statusColor} />
       )}
 
@@ -286,9 +318,6 @@ const Index = () => {
     </div>
   );
 };
-
-// Members sidebar component
-import { useServerMembers } from "@/hooks/useServer";
 
 const MembersSidebar = ({ serverId, statusColor }: { serverId: string; statusColor: Record<string, string> }) => {
   const { data: members } = useServerMembers(serverId);
