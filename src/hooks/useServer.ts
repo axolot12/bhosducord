@@ -65,7 +65,7 @@ export const useServers = () => {
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("servers")
-        .insert({ name, description: description || "", owner_id: user.id })
+        .insert({ name, description: description || "" })
         .select()
         .single();
       if (error) throw error;

@@ -316,7 +316,7 @@ const MembersSidebar = ({ serverId, statusColor }: { serverId: string; statusCol
         const profile = m.profiles;
         const name = profile?.display_name || profile?.username || "Unknown";
         return (
-          <UserProfilePopup key={m.id} userId={m.user_id}>
+          <UserProfilePopup key={m.id} userId={m.user_id} side="top">
             <div className="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-muted/50">
               <div className="relative">
                 <Avatar className="h-8 w-8">
