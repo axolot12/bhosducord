@@ -6,8 +6,8 @@ import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Hash, Volume2, Settings, Plus, ChevronDown, ChevronRight, Users, Compass, Copy,
-  Crown, LogOut, Trash2, ImagePlus, Link, CheckCheck, UserPlus, Lock, Eye, EyeOff
+  Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy,
+  Crown, LogOut, Trash2, Link, CheckCheck, UserPlus
 } from "lucide-react";
 import { UserProfilePopup, StatusChanger } from "@/components/UserProfilePopup";
 import { CreateServerDialog } from "@/components/ServerDialog";
@@ -222,7 +222,7 @@ const Index = () => {
                     </DropdownMenuItem>
                   )}
                   {isOwner && (
-                    <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <DropdownMenuItem onClick={() => navigate(`/server-settings/${selectedServer.id}`)}>
                       <Settings className="mr-2 h-4 w-4" /> Server Settings
                     </DropdownMenuItem>
                   )}
@@ -257,9 +257,6 @@ const Index = () => {
                       >
                         <Hash className="h-4 w-4 flex-shrink-0" />
                         <span className="flex-1 truncate text-left">{ch.name}</span>
-                        {isOwner && (
-                          <Settings className="h-3 w-3 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-                        )}
                       </button>
                     ))}
                   </div>
@@ -282,7 +279,6 @@ const Index = () => {
                           <Volume2 className="h-4 w-4 flex-shrink-0" />
                           {ch.name}
                         </button>
-                        {/* Show connected user below VC */}
                         {voiceChannel?.id === ch.id && (
                           <div className="ml-6 space-y-0.5 py-0.5">
                             <div className="flex items-center gap-1.5 rounded px-1.5 py-0.5">
@@ -393,6 +389,7 @@ const Index = () => {
         <ChatArea
           channelId={selectedChannelId}
           channelName={selectedChannel?.name || "general"}
+          serverId={selectedServerId}
           showMembersToggle
           showMembers={showMembers}
           onToggleMembers={() => setShowMembers(!showMembers)}

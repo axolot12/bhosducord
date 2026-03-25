@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
 import Settings from "./pages/Settings.tsx";
+import ServerSettings from "./pages/ServerSettings.tsx";
 import Invite from "./pages/Invite.tsx";
 import Discovery from "./pages/Discovery.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/server-settings/:serverId" element={<ServerSettings />} />
             <Route path="/invite/:code" element={<Invite />} />
             <Route path="/discovery" element={<Discovery />} />
             <Route path="*" element={<NotFound />} />
