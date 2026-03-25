@@ -120,13 +120,22 @@ export const ChatArea = ({ channelId, channelName, showMembersToggle, showMember
           <Hash className="h-5 w-5 text-muted-foreground" />
           <span className="font-display font-semibold text-foreground">{channelName}</span>
         </div>
-        <button
-          onClick={() => setShowPinned(!showPinned)}
-          className={`rounded p-1.5 transition-colors ${showPinned ? "text-discord-yellow" : "text-muted-foreground hover:text-foreground"}`}
-          title="Pinned Messages"
-        >
-          <Pin className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowPinned(!showPinned)}
+            className={`rounded p-1.5 transition-colors ${showPinned ? "text-discord-yellow" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Pin className="h-4 w-4" />
+          </button>
+          {showMembersToggle && onToggleMembers && (
+            <button
+              onClick={onToggleMembers}
+              className={`rounded p-1.5 transition-colors ${showMembers ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Users className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Pinned sidebar */}
