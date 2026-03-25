@@ -417,6 +417,10 @@ export type Database = {
         Returns: boolean
       }
       join_server_by_invite: { Args: { _invite_code: string }; Returns: string }
+      start_dm_conversation: {
+        Args: { _target_user_id: string }
+        Returns: string
+      }
     }
     Enums: {
       user_status: "online" | "idle" | "dnd" | "invisible" | "offline"

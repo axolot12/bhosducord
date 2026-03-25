@@ -4,7 +4,6 @@ import {
   Mic, MicOff, Headphones, HeadphoneOff, Monitor, PhoneOff, Video, VideoOff,
   Signal
 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 
@@ -14,7 +13,6 @@ interface VoiceChannelProps {
 }
 
 export const VoiceControls = ({ channelName, onDisconnect }: VoiceChannelProps) => {
-  const { profile } = useProfile();
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
 
@@ -63,7 +61,7 @@ export const VoiceControls = ({ channelName, onDisconnect }: VoiceChannelProps) 
   );
 };
 
-export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
+export const VoiceChannelView = ({ channelName, onLeave }: { channelName: string; onLeave: () => void }) => {
   const { profile } = useProfile();
   const displayName = profile?.display_name || profile?.username || "User";
 
@@ -79,17 +77,29 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const speakingFrameRef = useRef<number | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [micReady, setMicReady] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
 
   // Start microphone on mount
   useEffect(() => {
     const startMic = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
         micStreamRef.current = stream;
 
         // Set up audio analyser for speaking indicator
         const ctx = new AudioContext();
+        if (ctx.state === "suspended") {
+          await ctx.resume();
+        }
         audioContextRef.current = ctx;
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
@@ -103,16 +113,24 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
           analyserRef.current.getByteFrequencyData(dataArray);
           const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
           setIsSpeaking(avg > 15);
-          requestAnimationFrame(checkSpeaking);
+          speakingFrameRef.current = requestAnimationFrame(checkSpeaking);
         };
         checkSpeaking();
-      } catch {
+        setMicReady(true);
+        setMicError(null);
+      } catch (error: any) {
+        setMicReady(false);
+        setMicError(error?.message || "Could not access microphone");
         toast.error("Could not access microphone");
       }
     };
     startMic();
 
     return () => {
+      if (speakingFrameRef.current) {
+        cancelAnimationFrame(speakingFrameRef.current);
+        speakingFrameRef.current = null;
+      }
       micStreamRef.current?.getTracks().forEach(t => t.stop());
       camStreamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -133,6 +151,12 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
   useEffect(() => {
     if (deafened && !muted) setMuted(true);
   }, [deafened]);
+
+  useEffect(() => {
+    if (muted || deafened) {
+      setIsSpeaking(false);
+    }
+  }, [muted, deafened]);
 
   const toggleVideo = useCallback(async () => {
     if (videoOn) {
@@ -285,15 +309,17 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
         </button>
 
         <button
-          onClick={() => {
-            // Cleanup will happen in useEffect return
-          }}
+            onClick={onLeave}
           className="rounded-full bg-destructive p-3 text-destructive-foreground transition-colors hover:bg-destructive/80"
           title="Leave Voice"
         >
           <PhoneOff className="h-5 w-5" />
         </button>
       </div>
+
+        <div className="border-t border-border bg-discord-darker px-4 py-1.5 text-center text-xs text-muted-foreground">
+          {micError ? micError : micReady ? "Microphone connected" : "Connecting microphone..."}
+        </div>
     </div>
   );
 };

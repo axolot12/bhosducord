@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useServers, useChannels, useServerMembers, type Server, type Channel } from "@/hooks/useServer";
-import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
+import { useDmConversations, useFriendships, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy,
-  Crown, LogOut, Trash2, Link, CheckCheck, UserPlus
+  Crown, LogOut, Trash2, Link, CheckCheck, UserPlus, MessageSquare
 } from "lucide-react";
 import { UserProfilePopup, StatusChanger } from "@/components/UserProfilePopup";
 import { CreateServerDialog } from "@/components/ServerDialog";
@@ -31,7 +31,8 @@ const Index = () => {
   const { user, loading } = useAuth();
   const { profile } = useProfile();
   const { servers, isLoading: serversLoading } = useServers();
-  const { conversations } = useDmConversations();
+  const { conversations, createDm } = useDmConversations();
+  const { sendFriendRequest } = useFriendships();
   const navigate = useNavigate();
 
   const [view, setView] = useState<View>("friends");
@@ -80,6 +81,49 @@ const Index = () => {
   const handleJoinVoice = (ch: Channel) => {
     setVoiceChannel({ id: ch.id, name: ch.name });
     setView("voice");
+  };
+
+  const handleOpenMemberDm = async (targetUserId: string, targetProfile?: { username?: string; display_name?: string | null; avatar_url?: string | null; status?: string }) => {
+    try {
+      const convId = await createDm.mutateAsync(targetUserId);
+      const existing = conversations.find((c) => c.id === convId);
+
+      setView("dm");
+      setSelectedServerId(null);
+      setSelectedChannelId(null);
+      setSelectedDm(
+        existing || {
+          id: convId,
+          is_group: false,
+          name: null,
+          created_at: new Date().toISOString(),
+          participants: [
+            {
+              user_id: targetUserId,
+              profiles: targetProfile
+                ? {
+                    username: targetProfile.username || "user",
+                    display_name: targetProfile.display_name || null,
+                    avatar_url: targetProfile.avatar_url || null,
+                    status: targetProfile.status || "offline",
+                  }
+                : undefined,
+            },
+          ],
+        }
+      );
+    } catch (e: any) {
+      toast.error(e.message || "Failed to open DM");
+    }
+  };
+
+  const handleSendFriendRequestFromMember = async (username: string) => {
+    try {
+      await sendFriendRequest.mutateAsync(username);
+      toast.success(`Friend request sent to ${username}`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to send friend request");
+    }
   };
 
   const handleCopyInvite = (code: string) => {
@@ -384,7 +428,13 @@ const Index = () => {
 
       {/* Main Content Area */}
       {view === "voice" ? (
-        <VoiceChannelView channelName={voiceChannel?.name || "Voice"} />
+        <VoiceChannelView
+          channelName={voiceChannel?.name || "Voice"}
+          onLeave={() => {
+            setVoiceChannel(null);
+            setView("server");
+          }}
+        />
       ) : view === "server" ? (
         <ChatArea
           channelId={selectedChannelId}
@@ -402,7 +452,14 @@ const Index = () => {
 
       {/* Members Sidebar */}
       {(view === "server" || view === "voice") && selectedServerId && showMembers && (
-        <MembersSidebar serverId={selectedServerId} ownerId={selectedServer?.owner_id} statusColor={statusColor} />
+        <MembersSidebar
+          serverId={selectedServerId}
+          ownerId={selectedServer?.owner_id}
+          currentUserId={user.id}
+          statusColor={statusColor}
+          onOpenDm={handleOpenMemberDm}
+          onSendFriendRequest={handleSendFriendRequestFromMember}
+        />
       )}
 
       <CreateServerDialog open={showServerDialog} onOpenChange={setShowServerDialog} />
@@ -410,7 +467,21 @@ const Index = () => {
   );
 };
 
-const MembersSidebar = ({ serverId, ownerId, statusColor }: { serverId: string; ownerId?: string; statusColor: Record<string, string> }) => {
+const MembersSidebar = ({
+  serverId,
+  ownerId,
+  currentUserId,
+  statusColor,
+  onOpenDm,
+  onSendFriendRequest,
+}: {
+  serverId: string;
+  ownerId?: string;
+  currentUserId: string;
+  statusColor: Record<string, string>;
+  onOpenDm: (userId: string, profile?: { username?: string; display_name?: string | null; avatar_url?: string | null; status?: string }) => void;
+  onSendFriendRequest: (username: string) => void;
+}) => {
   const { data: members } = useServerMembers(serverId);
 
   return (
@@ -422,8 +493,33 @@ const MembersSidebar = ({ serverId, ownerId, statusColor }: { serverId: string; 
         const mProfile = m.profiles;
         const name = mProfile?.display_name || mProfile?.username || "Unknown";
         const isMemberOwner = m.user_id === ownerId;
+        const isSelf = m.user_id === currentUserId;
         return (
-          <UserProfilePopup key={m.id} userId={m.user_id} side="left">
+          <UserProfilePopup
+            key={m.id}
+            userId={m.user_id}
+            side="left"
+            actions={
+              !isSelf && mProfile?.username ? (
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => onOpenDm(m.user_id, mProfile)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/50"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span>Send Message</span>
+                  </button>
+                  <button
+                    onClick={() => onSendFriendRequest(mProfile.username)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/50"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>Send Friend Request</span>
+                  </button>
+                </div>
+              ) : undefined
+            }
+          >
             <div className="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-muted/50">
               <div className="relative">
                 <Avatar className="h-8 w-8">

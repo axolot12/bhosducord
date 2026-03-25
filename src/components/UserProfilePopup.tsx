@@ -10,6 +10,7 @@ interface UserProfilePopupProps {
   userId: string;
   children: React.ReactNode;
   side?: "top" | "right" | "bottom" | "left";
+  actions?: React.ReactNode;
 }
 
 interface ProfileData {
@@ -34,12 +35,15 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   offline: { label: "Offline", color: "bg-discord-grey", icon: Circle },
 };
 
-export const UserProfilePopup = ({ userId, children, side = "top" }: UserProfilePopupProps) => {
+export const UserProfilePopup = ({ userId, children, side = "top", actions }: UserProfilePopupProps) => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const fetchProfile = async () => {
-    const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
-    if (data) setProfileData(data as ProfileData);
+    setLoading(true);
+    const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
+    setProfileData((data as ProfileData | null) ?? null);
+    setLoading(false);
   };
 
   const status = statusConfig[profileData?.status || "offline"];
@@ -103,11 +107,22 @@ export const UserProfilePopup = ({ userId, children, side = "top" }: UserProfile
                   })}
                 </p>
               </div>
+
+              {actions && (
+                <>
+                  <Separator className="my-3" />
+                  {actions}
+                </>
+              )}
             </div>
           </>
         ) : (
           <div className="flex items-center justify-center p-8">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            {loading ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            ) : (
+              <p className="text-sm text-muted-foreground">Profile unavailable</p>
+            )}
           </div>
         )}
       </PopoverContent>
