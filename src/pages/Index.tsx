@@ -5,7 +5,10 @@ import { useServers, useChannels, useServerMembers, type Server, type Channel } 
 import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy } from "lucide-react";
+import {
+  Hash, Volume2, Settings, Plus, ChevronDown, ChevronRight, Users, Compass, Copy,
+  Crown, LogOut, Trash2, ImagePlus, Link, CheckCheck, UserPlus, Lock, Eye, EyeOff
+} from "lucide-react";
 import { UserProfilePopup, StatusChanger } from "@/components/UserProfilePopup";
 import { CreateServerDialog } from "@/components/ServerDialog";
 import { ChatArea } from "@/components/ChatArea";
@@ -13,7 +16,14 @@ import { DmChatArea } from "@/components/DmChatArea";
 import { FriendsView } from "@/components/FriendsView";
 import { VoiceControls, VoiceChannelView } from "@/components/VoiceChannel";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import logoImg from "@/assets/logo.png";
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator
+} from "@/components/ui/context-menu";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu";
 
 type View = "server" | "friends" | "dm" | "voice";
 
@@ -30,12 +40,15 @@ const Index = () => {
   const [selectedDm, setSelectedDm] = useState<DmConversation | null>(null);
   const [showServerDialog, setShowServerDialog] = useState(false);
   const [voiceChannel, setVoiceChannel] = useState<{ id: string; name: string } | null>(null);
+  const [showMembers, setShowMembers] = useState(true);
 
   const { data: channels } = useChannels(selectedServerId);
   const selectedServer = servers.find((s) => s.id === selectedServerId);
   const textChannels = (channels || []).filter((c) => c.type === "text" || c.type === "announcement");
   const voiceChannels = (channels || []).filter((c) => c.type === "voice");
   const selectedChannel = (channels || []).find((c) => c.id === selectedChannelId);
+
+  const isOwner = selectedServer?.owner_id === user?.id;
 
   useEffect(() => {
     if (textChannels.length > 0 && !selectedChannelId) {
@@ -75,6 +88,26 @@ const Index = () => {
     toast.success("Invite link copied!");
   };
 
+  const handleLeaveServer = async (serverId: string) => {
+    if (!user) return;
+    const { error } = await supabase.from("server_members").delete()
+      .eq("server_id", serverId).eq("user_id", user.id);
+    if (error) toast.error("Failed to leave server");
+    else {
+      toast.success("Left server");
+      handleHome();
+    }
+  };
+
+  const handleDeleteServer = async (serverId: string) => {
+    const { error } = await supabase.from("servers").delete().eq("id", serverId);
+    if (error) toast.error("Failed to delete server");
+    else {
+      toast.success("Server deleted");
+      handleHome();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -111,25 +144,48 @@ const Index = () => {
         <div className="mx-auto h-0.5 w-8 rounded-full bg-border" />
 
         {servers.map((server) => (
-          <button
-            key={server.id}
-            onClick={() => handleSelectServer(server)}
-            title={server.name}
-            className={`group relative flex h-12 w-12 items-center justify-center font-display text-sm font-bold transition-all ${
-              selectedServerId === server.id
-                ? "rounded-xl bg-primary text-primary-foreground"
-                : "rounded-[24px] bg-secondary text-secondary-foreground hover:rounded-xl hover:bg-primary hover:text-primary-foreground"
-            }`}
-          >
-            {server.icon_url ? (
-              <img src={server.icon_url} alt={server.name} className="h-full w-full rounded-inherit object-cover" />
-            ) : (
-              server.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
-            )}
-            {selectedServerId === server.id && (
-              <div className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-foreground" />
-            )}
-          </button>
+          <ContextMenu key={server.id}>
+            <ContextMenuTrigger>
+              <button
+                onClick={() => handleSelectServer(server)}
+                title={server.name}
+                className={`group relative flex h-12 w-12 items-center justify-center font-display text-sm font-bold transition-all ${
+                  selectedServerId === server.id
+                    ? "rounded-xl bg-primary text-primary-foreground"
+                    : "rounded-[24px] bg-secondary text-secondary-foreground hover:rounded-xl hover:bg-primary hover:text-primary-foreground"
+                }`}
+              >
+                {server.icon_url ? (
+                  <img src={server.icon_url} alt={server.name} className="h-full w-full rounded-inherit object-cover" />
+                ) : (
+                  server.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
+                )}
+                {selectedServerId === server.id && (
+                  <div className="absolute -left-1 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-foreground" />
+                )}
+              </button>
+            </ContextMenuTrigger>
+            <ContextMenuContent className="w-52 border-border bg-card">
+              <ContextMenuItem onClick={() => toast.success("Marked as read")}>
+                <CheckCheck className="mr-2 h-4 w-4" /> Mark As Read
+              </ContextMenuItem>
+              {server.invite_code && (
+                <ContextMenuItem onClick={() => handleCopyInvite(server.invite_code)}>
+                  <Link className="mr-2 h-4 w-4" /> Copy Invite Link
+                </ContextMenuItem>
+              )}
+              <ContextMenuSeparator />
+              {server.owner_id === user?.id ? (
+                <ContextMenuItem onClick={() => handleDeleteServer(server.id)} className="text-destructive focus:text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete Server
+                </ContextMenuItem>
+              ) : (
+                <ContextMenuItem onClick={() => handleLeaveServer(server.id)} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" /> Leave Server
+                </ContextMenuItem>
+              )}
+            </ContextMenuContent>
+          </ContextMenu>
         ))}
 
         <button
@@ -151,10 +207,37 @@ const Index = () => {
         {view === "server" || view === "voice" ? (
           selectedServer ? (
             <>
-              <button className="flex h-12 items-center justify-between border-b border-border px-4 font-display font-semibold text-foreground hover:bg-muted/50">
-                <span className="truncate">{selectedServer.name}</span>
-                <ChevronDown className="h-4 w-4 flex-shrink-0" />
-              </button>
+              {/* Server name dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex h-12 items-center justify-between border-b border-border px-4 font-display font-semibold text-foreground hover:bg-muted/50">
+                    <span className="truncate">{selectedServer.name}</span>
+                    <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 border-border bg-card" align="start">
+                  {selectedServer.invite_code && (
+                    <DropdownMenuItem onClick={() => handleCopyInvite(selectedServer.invite_code)}>
+                      <UserPlus className="mr-2 h-4 w-4" /> Invite People
+                    </DropdownMenuItem>
+                  )}
+                  {isOwner && (
+                    <DropdownMenuItem onClick={() => navigate("/settings")}>
+                      <Settings className="mr-2 h-4 w-4" /> Server Settings
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  {isOwner ? (
+                    <DropdownMenuItem onClick={() => handleDeleteServer(selectedServer.id)} className="text-destructive focus:text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete Server
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem onClick={() => handleLeaveServer(selectedServer.id)} className="text-destructive focus:text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" /> Leave Server
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <div className="flex-1 overflow-auto p-2">
                 {textChannels.length > 0 && (
@@ -173,7 +256,10 @@ const Index = () => {
                         }`}
                       >
                         <Hash className="h-4 w-4 flex-shrink-0" />
-                        {ch.name}
+                        <span className="flex-1 truncate text-left">{ch.name}</span>
+                        {isOwner && (
+                          <Settings className="h-3 w-3 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -184,18 +270,35 @@ const Index = () => {
                       <ChevronDown className="h-3 w-3" /> Voice Channels
                     </button>
                     {voiceChannels.map((ch) => (
-                      <button
-                        key={ch.id}
-                        onClick={() => handleJoinVoice(ch)}
-                        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                          voiceChannel?.id === ch.id
-                            ? "bg-muted text-foreground"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                        }`}
-                      >
-                        <Volume2 className="h-4 w-4 flex-shrink-0" />
-                        {ch.name}
-                      </button>
+                      <div key={ch.id}>
+                        <button
+                          onClick={() => handleJoinVoice(ch)}
+                          className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                            voiceChannel?.id === ch.id
+                              ? "bg-muted text-foreground"
+                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          }`}
+                        >
+                          <Volume2 className="h-4 w-4 flex-shrink-0" />
+                          {ch.name}
+                        </button>
+                        {/* Show connected user below VC */}
+                        {voiceChannel?.id === ch.id && (
+                          <div className="ml-6 space-y-0.5 py-0.5">
+                            <div className="flex items-center gap-1.5 rounded px-1.5 py-0.5">
+                              <Avatar className="h-5 w-5">
+                                <AvatarImage src={profile?.avatar_url || ""} />
+                                <AvatarFallback className="bg-primary text-[8px] text-primary-foreground">
+                                  {(profile?.display_name || profile?.username || "?")[0].toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-xs text-discord-green">
+                                {profile?.display_name || profile?.username}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -287,7 +390,13 @@ const Index = () => {
       {view === "voice" ? (
         <VoiceChannelView channelName={voiceChannel?.name || "Voice"} />
       ) : view === "server" ? (
-        <ChatArea channelId={selectedChannelId} channelName={selectedChannel?.name || "general"} />
+        <ChatArea
+          channelId={selectedChannelId}
+          channelName={selectedChannel?.name || "general"}
+          showMembersToggle
+          showMembers={showMembers}
+          onToggleMembers={() => setShowMembers(!showMembers)}
+        />
       ) : view === "dm" ? (
         <DmChatArea conversation={selectedDm} />
       ) : (
@@ -295,8 +404,8 @@ const Index = () => {
       )}
 
       {/* Members Sidebar */}
-      {(view === "server" || view === "voice") && selectedServerId && (
-        <MembersSidebar serverId={selectedServerId} statusColor={statusColor} />
+      {(view === "server" || view === "voice") && selectedServerId && showMembers && (
+        <MembersSidebar serverId={selectedServerId} ownerId={selectedServer?.owner_id} statusColor={statusColor} />
       )}
 
       <CreateServerDialog open={showServerDialog} onOpenChange={setShowServerDialog} />
@@ -304,7 +413,7 @@ const Index = () => {
   );
 };
 
-const MembersSidebar = ({ serverId, statusColor }: { serverId: string; statusColor: Record<string, string> }) => {
+const MembersSidebar = ({ serverId, ownerId, statusColor }: { serverId: string; ownerId?: string; statusColor: Record<string, string> }) => {
   const { data: members } = useServerMembers(serverId);
 
   return (
@@ -313,21 +422,25 @@ const MembersSidebar = ({ serverId, statusColor }: { serverId: string; statusCol
         <Users className="mr-1 inline h-3 w-3" /> Members — {(members || []).length}
       </h3>
       {(members || []).map((m: any) => {
-        const profile = m.profiles;
-        const name = profile?.display_name || profile?.username || "Unknown";
+        const mProfile = m.profiles;
+        const name = mProfile?.display_name || mProfile?.username || "Unknown";
+        const isMemberOwner = m.user_id === ownerId;
         return (
-          <UserProfilePopup key={m.id} userId={m.user_id} side="top">
+          <UserProfilePopup key={m.id} userId={m.user_id} side="left">
             <div className="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-muted/50">
               <div className="relative">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={profile?.avatar_url || ""} />
+                  <AvatarImage src={mProfile?.avatar_url || ""} />
                   <AvatarFallback className="bg-primary text-xs text-primary-foreground">
                     {name[0]?.toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-dark ${statusColor[profile?.status || "offline"]}`} />
+                <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-dark ${statusColor[mProfile?.status || "offline"]}`} />
               </div>
-              <span className="truncate text-sm text-foreground">{name}</span>
+              <span className="flex-1 truncate text-sm text-foreground">{name}</span>
+              {isMemberOwner && (
+                <Crown className="h-3.5 w-3.5 flex-shrink-0 text-discord-yellow" title="Server Owner" />
+              )}
             </div>
           </UserProfilePopup>
         );
