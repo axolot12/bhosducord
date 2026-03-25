@@ -201,51 +201,21 @@ export const useDmConversations = () => {
   const createDm = useMutation({
     mutationFn: async (targetUserId: string) => {
       if (!user) throw new Error("Not authenticated");
-      // Check existing conversation
-      const { data: myConvs } = await supabase
-        .from("dm_participants")
-        .select("conversation_id")
-        .eq("user_id", user.id);
+      const { data, error } = await supabase.rpc("start_dm_conversation", {
+        _target_user_id: targetUserId,
+      });
 
-      if (myConvs && myConvs.length > 0) {
-        const { data: theirConvs } = await supabase
-          .from("dm_participants")
-          .select("conversation_id")
-          .eq("user_id", targetUserId)
-          .in("conversation_id", myConvs.map((c: any) => c.conversation_id));
-
-        if (theirConvs && theirConvs.length > 0) {
-          // Check if it's a non-group DM
-          const { data: existing } = await supabase
-            .from("dm_conversations")
-            .select("*")
-            .eq("is_group", false)
-            .in("id", theirConvs.map((c: any) => c.conversation_id))
-            .limit(1);
-          if (existing && existing.length > 0) return existing[0].id;
+      if (error) {
+        if (error.message?.toLowerCase().includes("not authenticated")) {
+          throw new Error("Please log in again and retry");
         }
+        if (error.message?.toLowerCase().includes("user not found")) {
+          throw new Error("User not found");
+        }
+        throw error;
       }
 
-      // Create new
-      const { data: conv, error: convError } = await supabase
-        .from("dm_conversations")
-        .insert({ is_group: false })
-        .select()
-        .single();
-      if (convError) throw convError;
-
-      // Add participants
-      const { error: p1Error } = await supabase
-        .from("dm_participants")
-        .insert({ conversation_id: conv.id, user_id: user.id });
-      if (p1Error) throw p1Error;
-
-      const { error: p2Error } = await supabase
-        .from("dm_participants")
-        .insert({ conversation_id: conv.id, user_id: targetUserId });
-      if (p2Error) throw p2Error;
-
-      return conv.id;
+      return data as string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dm-conversations"] });
