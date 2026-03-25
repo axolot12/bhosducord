@@ -5,7 +5,8 @@ import { useServers, useChannels, useServerMembers, type Server, type Channel } 
 import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy, Telescope } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy } from "lucide-react";
+import { UserProfilePopup, StatusChanger } from "@/components/UserProfilePopup";
 import { CreateServerDialog } from "@/components/ServerDialog";
 import { ChatArea } from "@/components/ChatArea";
 import { DmChatArea } from "@/components/DmChatArea";
@@ -252,11 +253,9 @@ const Index = () => {
                     }`}
                   >
                     <Avatar className="h-8 w-8">
-                      {other?.avatar_url ? (
-                        <AvatarImage src={other.avatar_url} />
-                      ) : null}
+                      <AvatarImage src={other?.avatar_url || ""} />
                       <AvatarFallback className="bg-primary text-[10px] text-primary-foreground">
-                        <Telescope className="h-4 w-4" />
+                        {name[0]?.toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <span className="truncate">{name}</span>
@@ -277,23 +276,7 @@ const Index = () => {
 
         {/* User Panel */}
         <div className="flex items-center gap-2 bg-discord-darker p-2">
-          <div className="relative">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={profile?.avatar_url || ""} />
-              <AvatarFallback className="bg-primary text-xs text-primary-foreground">
-                {(profile?.display_name || profile?.username || "?")[0].toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-darker ${statusColor[profile?.status || "offline"]}`} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              {profile?.display_name || profile?.username}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {profile?.custom_status || "Online"}
-            </p>
-          </div>
+          <StatusChanger />
           <button onClick={() => navigate("/settings")} className="rounded p-1 text-muted-foreground hover:bg-muted/50 hover:text-foreground">
             <Settings className="h-4 w-4" />
           </button>
@@ -333,18 +316,20 @@ const MembersSidebar = ({ serverId, statusColor }: { serverId: string; statusCol
         const profile = m.profiles;
         const name = profile?.display_name || profile?.username || "Unknown";
         return (
-          <div key={m.id} className="flex items-center gap-2 rounded-md p-2 hover:bg-muted/50">
-            <div className="relative">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={profile?.avatar_url || ""} />
-                <AvatarFallback className="bg-primary text-xs text-primary-foreground">
-                  {name[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-dark ${statusColor[profile?.status || "offline"]}`} />
+          <UserProfilePopup key={m.id} userId={m.user_id}>
+            <div className="flex cursor-pointer items-center gap-2 rounded-md p-2 hover:bg-muted/50">
+              <div className="relative">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_url || ""} />
+                  <AvatarFallback className="bg-primary text-xs text-primary-foreground">
+                    {name[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-dark ${statusColor[profile?.status || "offline"]}`} />
+              </div>
+              <span className="truncate text-sm text-foreground">{name}</span>
             </div>
-            <span className="truncate text-sm text-foreground">{name}</span>
-          </div>
+          </UserProfilePopup>
         );
       })}
     </div>
