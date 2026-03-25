@@ -1,6 +1,21 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-...
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
+import logoImg from "@/assets/logo.png";
+
+const Auth = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get("redirect") || "/";
@@ -80,14 +95,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-discord-darker p-4">
-      {/* Decorative background */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-[420px]">
-        {/* Logo */}
         <div className="mb-6 flex flex-col items-center gap-3">
           <img src={logoImg} alt="BhosduCord" className="h-24 w-24 drop-shadow-2xl" width={96} height={96} />
           <div className="text-center">
@@ -100,7 +113,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
           </div>
         </div>
 
-        {/* Auth Card */}
         <div className="rounded-xl border border-border/50 bg-card/80 p-7 shadow-2xl backdrop-blur-sm">
           <form onSubmit={handleEmailAuth} className="space-y-4">
             {!isLogin && (
@@ -183,7 +195,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
             </Button>
           </form>
 
-          {/* Toggle */}
           <p className="mt-5 text-center text-sm text-muted-foreground">
             {isLogin ? "Need an account? " : "Already have an account? "}
             <button
