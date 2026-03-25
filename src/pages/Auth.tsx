@@ -25,7 +25,13 @@ const Auth = () => {
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          const loginMessage = (error.message || "").toLowerCase();
+          if (loginMessage.includes("email not confirmed")) {
+            throw new Error("Please verify your email first, then log in.");
+          }
+          throw error;
+        }
         navigate("/");
       } else {
         if (!username.trim()) {
@@ -34,7 +40,7 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -46,10 +52,24 @@ const Auth = () => {
           },
         });
         if (error) throw error;
-        toast.success("Check your email to verify your account!");
+
+        if (data.session) {
+          toast.success("Account created successfully!");
+          navigate("/");
+          return;
+        }
+
+        toast.success("Account created! Verify your email, then log in.");
+        setIsLogin(true);
+        setPassword("");
       }
     } catch (error: any) {
-      toast.error(error.message);
+      const message = error?.message || "Something went wrong";
+      if (message.toLowerCase().includes("invalid login credentials")) {
+        toast.error("Invalid credentials. If you just signed up, verify your email first.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoading(false);
     }
