@@ -29,6 +29,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        // Set user online when they log in
+        if (session?.user) {
+          setTimeout(() => {
+            supabase
+              .from("profiles")
+              .update({ status: "online" as any })
+              .eq("user_id", session.user.id)
+              .then();
+          }, 0);
+        }
       }
     );
 
@@ -36,9 +47,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) {
+        supabase
+          .from("profiles")
+          .update({ status: "online" as any })
+          .eq("user_id", session.user.id)
+          .then();
+      }
     });
 
-    return () => subscription.unsubscribe();
+    // Set offline on tab close
+    const handleBeforeUnload = () => {
+      if (user) {
+        navigator.sendBeacon && supabase
+          .from("profiles")
+          .update({ status: "offline" as any })
+          .eq("user_id", user.id)
+          .then();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, []);
 
   const signOut = async () => {
