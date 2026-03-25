@@ -69,7 +69,7 @@ const MessageItem = ({ msg, onReply }: { msg: Message; onReply: (id: string) => 
   );
 };
 
-export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
+export const ChatArea = ({ channelId, channelName, showMembersToggle, showMembers, onToggleMembers }: ChatAreaProps) => {
   const { messages, isLoading, subscribeToMessages } = useMessages(channelId);
   const sendMessage = useSendMessage();
   const [input, setInput] = useState("");
