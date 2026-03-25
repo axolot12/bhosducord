@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Circle, Moon, MinusCircle, EyeOff } from "lucide-react";
+import { ChevronRight, Circle, EyeOff, MinusCircle, Moon } from "lucide-react";
 
 interface UserProfilePopupProps {
   userId: string;
@@ -35,16 +34,12 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   offline: { label: "Offline", color: "bg-discord-grey", icon: Circle },
 };
 
-export const UserProfilePopup = ({ userId, children, side = "right" }: UserProfilePopupProps) => {
+export const UserProfilePopup = ({ userId, children, side = "top" }: UserProfilePopupProps) => {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
 
   const fetchProfile = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    if (data) setProfileData(data as any);
+    const { data } = await supabase.from("profiles").select("*").eq("user_id", userId).single();
+    if (data) setProfileData(data as ProfileData);
   };
 
   const status = statusConfig[profileData?.status || "offline"];
@@ -52,13 +47,12 @@ export const UserProfilePopup = ({ userId, children, side = "right" }: UserProfi
 
   return (
     <Popover>
-      <PopoverTrigger asChild onClick={() => fetchProfile()}>
+      <PopoverTrigger asChild onClick={fetchProfile}>
         {children}
       </PopoverTrigger>
-      <PopoverContent side={side} className="w-72 border-border bg-card p-0" align="start">
+      <PopoverContent side={side} align="start" className="w-72 border-border bg-card p-0">
         {profileData ? (
           <>
-            {/* Banner */}
             <div className="h-16 rounded-t-lg">
               {profileData.banner_url ? (
                 <img src={profileData.banner_url} alt="" className="h-full w-full rounded-t-lg object-cover" />
@@ -67,7 +61,6 @@ export const UserProfilePopup = ({ userId, children, side = "right" }: UserProfi
               )}
             </div>
 
-            {/* Avatar */}
             <div className="relative px-4">
               <div className="relative -mt-8 inline-block">
                 <Avatar className="h-16 w-16 border-4 border-card">
@@ -80,8 +73,7 @@ export const UserProfilePopup = ({ userId, children, side = "right" }: UserProfi
               </div>
             </div>
 
-            {/* Info */}
-            <div className="px-4 pb-4 pt-2">
+            <div className="max-h-64 overflow-y-auto px-4 pb-4 pt-2">
               <h3 className="font-display text-lg font-bold text-foreground">{name}</h3>
               <p className="text-sm text-muted-foreground">
                 {profileData.username}#{profileData.discriminator}
@@ -123,10 +115,9 @@ export const UserProfilePopup = ({ userId, children, side = "right" }: UserProfi
   );
 };
 
-// Status changer for own profile - shown in user panel
 export const StatusChanger = () => {
-  const { user } = useAuth();
   const { profile, updateProfile } = useProfile();
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
 
   const statuses = [
     { value: "online", label: "Online", color: "bg-discord-green", icon: Circle },
@@ -162,23 +153,74 @@ export const StatusChanger = () => {
           </div>
         </button>
       </PopoverTrigger>
-      <PopoverContent side="top" align="start" className="w-56 border-border bg-card p-2">
-        <p className="mb-2 px-2 text-xs font-bold uppercase text-muted-foreground">Set Status</p>
-        {statuses.map((s) => {
-          const Icon = s.icon;
-          return (
-            <button
-              key={s.value}
-              onClick={() => handleStatusChange(s.value)}
-              className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/50 ${
-                profile?.status === s.value ? "bg-muted text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className={`h-2.5 w-2.5 rounded-full ${s.color}`} />
-              {s.label}
+
+      <PopoverContent side="top" align="start" className="w-72 border-border bg-card p-0">
+        <div className="h-16 rounded-t-lg bg-gradient-to-r from-primary to-accent" />
+
+        <div className="relative px-4">
+          <div className="relative -mt-8 inline-block">
+            <Avatar className="h-16 w-16 border-4 border-card">
+              <AvatarImage src={profile?.avatar_url || ""} />
+              <AvatarFallback className="bg-primary text-lg font-bold text-primary-foreground">
+                {(profile?.display_name || profile?.username || "?")[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-[3px] border-card ${statusConfig[profile?.status || "offline"].color}`} />
+          </div>
+        </div>
+
+        <div className="max-h-72 overflow-y-auto px-4 pb-4 pt-2">
+          <h3 className="font-display text-lg font-bold text-foreground">
+            {profile?.display_name || profile?.username}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {profile?.username}#{profile?.discriminator}
+          </p>
+
+          {profile?.about_me && (
+            <>
+              <Separator className="my-3" />
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase text-muted-foreground">About Me</p>
+                <p className="text-sm text-foreground/80">{profile.about_me}</p>
+              </div>
+            </>
+          )}
+
+          <Separator className="my-3" />
+
+          <div
+            className="rounded-md"
+            onMouseEnter={() => setStatusMenuOpen(true)}
+            onMouseLeave={() => setStatusMenuOpen(false)}
+          >
+            <button className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted/50">
+              <span>Change Status</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
-          );
-        })}
+
+            <div className={`overflow-hidden transition-all duration-150 ${statusMenuOpen ? "max-h-60" : "max-h-0"}`}>
+              <div className="mt-1 space-y-1 rounded-md bg-secondary/40 p-1.5">
+                {statuses.map((s) => {
+                  const Icon = s.icon;
+                  return (
+                    <button
+                      key={s.value}
+                      onClick={() => handleStatusChange(s.value)}
+                      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 ${
+                        profile?.status === s.value ? "bg-muted text-foreground" : "text-muted-foreground"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className={`h-2.5 w-2.5 rounded-full ${s.color}`} />
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       </PopoverContent>
     </Popover>
   );
