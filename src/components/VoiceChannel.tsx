@@ -136,9 +136,20 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
 
   const toggleVideo = useCallback(async () => {
     if (videoOn) {
-      camStreamRef.current?.getTracks().forEach(t => t.stop());
-      camStreamRef.current = null;
-      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      // Stop all video tracks to fully release the camera
+      if (camStreamRef.current) {
+        camStreamRef.current.getTracks().forEach(t => {
+          t.stop();
+          t.enabled = false;
+        });
+        camStreamRef.current = null;
+      }
+      // Clear all video elements that might hold the stream
+      if (localVideoRef.current) {
+        localVideoRef.current.pause();
+        localVideoRef.current.srcObject = null;
+        localVideoRef.current.load();
+      }
       setVideoOn(false);
     } else {
       try {
