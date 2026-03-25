@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Eye, EyeOff, Telescope } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 
 const Auth = () => {
@@ -17,6 +17,8 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/";
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +34,24 @@ const Auth = () => {
           }
           throw error;
         }
-        navigate("/");
+        navigate(redirectTo);
       } else {
-        if (!username.trim()) {
+        const normalizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24);
+        if (!normalizedUsername) {
           toast.error("Username is required");
           setLoading(false);
           return;
+        }
+
+        const { data: usernameMatches, error: usernameCheckError } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .ilike("username", normalizedUsername)
+          .limit(1);
+
+        if (usernameCheckError) throw usernameCheckError;
+        if ((usernameMatches || []).length > 0) {
+          throw new Error("Username is already taken");
         }
 
         const { data, error } = await supabase.auth.signUp({
@@ -45,17 +59,16 @@ const Auth = () => {
           password,
           options: {
             data: {
-              username: username.trim(),
-              display_name: displayName.trim() || username.trim(),
+              username: normalizedUsername,
+              display_name: displayName.trim() || normalizedUsername,
             },
-            emailRedirectTo: window.location.origin,
           },
         });
         if (error) throw error;
 
         if (data.session) {
           toast.success("Account created successfully!");
-          navigate("/");
+          navigate(redirectTo);
           return;
         }
 
@@ -65,8 +78,13 @@ const Auth = () => {
       }
     } catch (error: any) {
       const message = error?.message || "Something went wrong";
-      if (message.toLowerCase().includes("invalid login credentials")) {
+      const lowered = message.toLowerCase();
+      if (lowered.includes("invalid login credentials")) {
         toast.error("Invalid credentials. If you just signed up, verify your email first.");
+      } else if (lowered.includes("user already registered")) {
+        toast.error("This email is already registered. Please log in.");
+      } else if (lowered.includes("redirect url") || lowered.includes("redirect_to")) {
+        toast.error("Login URL is invalid. Please use the app link directly and try again.");
       } else {
         toast.error(message);
       }
@@ -77,14 +95,12 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-discord-darker p-4">
-      {/* Decorative background */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
       <div className="relative z-10 w-full max-w-[420px]">
-        {/* Logo */}
         <div className="mb-6 flex flex-col items-center gap-3">
           <img src={logoImg} alt="BhosduCord" className="h-24 w-24 drop-shadow-2xl" width={96} height={96} />
           <div className="text-center">
@@ -97,7 +113,6 @@ const Auth = () => {
           </div>
         </div>
 
-        {/* Auth Card */}
         <div className="rounded-xl border border-border/50 bg-card/80 p-7 shadow-2xl backdrop-blur-sm">
           <form onSubmit={handleEmailAuth} className="space-y-4">
             {!isLogin && (
@@ -180,7 +195,6 @@ const Auth = () => {
             </Button>
           </form>
 
-          {/* Toggle */}
           <p className="mt-5 text-center text-sm text-muted-foreground">
             {isLogin ? "Need an account? " : "Already have an account? "}
             <button

@@ -396,6 +396,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_invite_server: {
+        Args: { _invite_code: string }
+        Returns: {
+          already_member: boolean
+          description: string
+          icon_url: string
+          id: string
+          is_public: boolean
+          member_count: number
+          name: string
+        }[]
+      }
       is_dm_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
@@ -404,6 +416,7 @@ export type Database = {
         Args: { _server_id: string; _user_id: string }
         Returns: boolean
       }
+      join_server_by_invite: { Args: { _invite_code: string }; Returns: string }
     }
     Enums: {
       user_status: "online" | "idle" | "dnd" | "invisible" | "offline"

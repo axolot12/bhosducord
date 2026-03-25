@@ -83,7 +83,7 @@ const Index = () => {
   };
 
   const handleCopyInvite = (code: string) => {
-    const url = `${window.location.origin}/invite/${code}`;
+    const url = `${window.location.origin}/#/invite/${code}`;
     navigator.clipboard.writeText(url);
     toast.success("Invite link copied!");
   };

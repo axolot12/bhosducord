@@ -21,29 +21,32 @@ export const InviteEmbed = ({ inviteCode }: InviteEmbedProps) => {
   useEffect(() => {
     const fetch = async () => {
       const { data } = await supabase
-        .from("servers")
-        .select("id, name, icon_url, description, member_count")
-        .eq("invite_code", inviteCode)
+        .rpc("get_invite_server", { _invite_code: inviteCode })
         .single();
-      setServer(data);
+      setServer(data || null);
       setLoading(false);
     };
     fetch();
   }, [inviteCode]);
 
   const handleJoin = async () => {
-    if (!user || !server) return;
+    if (!server) return;
+    if (!user) {
+      toast.error("Please log in to join this server");
+      return;
+    }
+
     setJoining(true);
     try {
-      const { error } = await supabase
-        .from("server_members")
-        .insert({ server_id: server.id, user_id: user.id });
-      if (error?.code === "23505") toast.info("Already a member!");
-      else if (error) throw error;
-      else toast.success(`Joined ${server.name}!`);
+      const { error } = await supabase.rpc("join_server_by_invite", { _invite_code: inviteCode });
+      if (error) throw error;
+
+      toast.success(`Joined ${server.name}!`);
       queryClient.invalidateQueries({ queryKey: ["servers"] });
     } catch (e: any) {
-      toast.error(e.message);
+      const msg = (e?.message || "").toLowerCase();
+      if (msg.includes("already")) toast.info("Already a member!");
+      else toast.error(e.message);
     } finally {
       setJoining(false);
     }
@@ -73,10 +76,9 @@ export const InviteEmbed = ({ inviteCode }: InviteEmbedProps) => {
   );
 };
 
-// Utility to detect invite links in message content
 export const parseMessageContent = (content: string, baseUrl: string) => {
-  // Match invite links like https://domain.com/invite/CODE or just invite codes
-  const inviteRegex = new RegExp(`(?:${baseUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})?/invite/([a-zA-Z0-9]+)`, 'g');
+  const escapedBase = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const inviteRegex = new RegExp(`(?:${escapedBase}(?:/\\#)?|\\#)?/invite/([a-zA-Z0-9]+)`, "g");
   const parts: { type: "text" | "invite"; value: string }[] = [];
   let lastIndex = 0;
   let match;
