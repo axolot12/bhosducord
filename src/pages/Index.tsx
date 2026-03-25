@@ -259,7 +259,6 @@ const Index = () => {
                         <Telescope className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
-                    </Avatar>
                     <span className="truncate">{name}</span>
                   </button>
                 );
