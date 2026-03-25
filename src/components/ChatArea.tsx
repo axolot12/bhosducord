@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Plus, Send, Pin } from "lucide-react";
+import { Hash, Plus, Send, Pin, Users } from "lucide-react";
 import { useMessages, useSendMessage, type Message } from "@/hooks/useServer";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
