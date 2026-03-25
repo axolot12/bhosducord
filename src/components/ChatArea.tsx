@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Plus, Send, Pin } from "lucide-react";
+import { Hash, Plus, Send, Pin, Users } from "lucide-react";
 import { useMessages, useSendMessage, type Message } from "@/hooks/useServer";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
@@ -10,6 +10,9 @@ import { InviteEmbed, parseMessageContent } from "@/components/InviteEmbed";
 interface ChatAreaProps {
   channelId: string | null;
   channelName: string;
+  showMembersToggle?: boolean;
+  showMembers?: boolean;
+  onToggleMembers?: () => void;
 }
 
 const BASE_URL = window.location.origin;
@@ -66,7 +69,7 @@ const MessageItem = ({ msg, onReply }: { msg: Message; onReply: (id: string) => 
   );
 };
 
-export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
+export const ChatArea = ({ channelId, channelName, showMembersToggle, showMembers, onToggleMembers }: ChatAreaProps) => {
   const { messages, isLoading, subscribeToMessages } = useMessages(channelId);
   const sendMessage = useSendMessage();
   const [input, setInput] = useState("");
@@ -117,13 +120,22 @@ export const ChatArea = ({ channelId, channelName }: ChatAreaProps) => {
           <Hash className="h-5 w-5 text-muted-foreground" />
           <span className="font-display font-semibold text-foreground">{channelName}</span>
         </div>
-        <button
-          onClick={() => setShowPinned(!showPinned)}
-          className={`rounded p-1.5 transition-colors ${showPinned ? "text-discord-yellow" : "text-muted-foreground hover:text-foreground"}`}
-          title="Pinned Messages"
-        >
-          <Pin className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowPinned(!showPinned)}
+            className={`rounded p-1.5 transition-colors ${showPinned ? "text-discord-yellow" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            <Pin className="h-4 w-4" />
+          </button>
+          {showMembersToggle && onToggleMembers && (
+            <button
+              onClick={onToggleMembers}
+              className={`rounded p-1.5 transition-colors ${showMembers ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Users className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Pinned sidebar */}
