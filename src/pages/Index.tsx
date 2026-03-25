@@ -252,10 +252,13 @@ const Index = () => {
                     }`}
                   >
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={other?.avatar_url || ""} />
+                      {other?.avatar_url ? (
+                        <AvatarImage src={other.avatar_url} />
+                      ) : null}
                       <AvatarFallback className="bg-primary text-[10px] text-primary-foreground">
-                        {name[0]?.toUpperCase()}
+                        <Telescope className="h-4 w-4" />
                       </AvatarFallback>
+                    </Avatar>
                     </Avatar>
                     <span className="truncate">{name}</span>
                   </button>
