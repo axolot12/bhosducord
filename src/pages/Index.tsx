@@ -5,7 +5,7 @@ import { useServers, useChannels, useServerMembers, type Server, type Channel } 
 import { useDmConversations, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy, Telescope } from "lucide-react";
 import { CreateServerDialog } from "@/components/ServerDialog";
 import { ChatArea } from "@/components/ChatArea";
 import { DmChatArea } from "@/components/DmChatArea";
@@ -252,9 +252,11 @@ const Index = () => {
                     }`}
                   >
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={other?.avatar_url || ""} />
+                      {other?.avatar_url ? (
+                        <AvatarImage src={other.avatar_url} />
+                      ) : null}
                       <AvatarFallback className="bg-primary text-[10px] text-primary-foreground">
-                        {name[0]?.toUpperCase()}
+                        <Telescope className="h-4 w-4" />
                       </AvatarFallback>
                     </Avatar>
                     <span className="truncate">{name}</span>

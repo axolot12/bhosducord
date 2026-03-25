@@ -88,7 +88,7 @@ export const useFriendships = () => {
       const { data: target, error: findError } = await supabase
         .from("profiles")
         .select("user_id")
-        .eq("username", username)
+        .ilike("username", username)
         .single();
       if (findError) throw new Error("User not found");
       if (target.user_id === user.id) throw new Error("Cannot add yourself");
