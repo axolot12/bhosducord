@@ -195,35 +195,28 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
     <div className="flex flex-1 flex-col bg-background">
       {/* Main view area */}
       <div className="flex flex-1 items-center justify-center p-6">
-        {screenSharing ? (
-          <div className="relative h-full w-full max-h-[70vh] overflow-hidden rounded-xl border border-border bg-black">
-            <video
-              ref={screenVideoRef}
-              autoPlay
-              playsInline
-              className="h-full w-full object-contain"
-            />
-            {/* Small self-view overlay */}
-            {videoOn && (
-              <div className="absolute bottom-4 right-4 h-32 w-44 overflow-hidden rounded-lg border-2 border-border bg-black shadow-lg">
-                <video ref={localVideoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-              </div>
-            )}
-          </div>
-        ) : videoOn ? (
-          <div className="relative h-full w-full max-h-[70vh] max-w-2xl overflow-hidden rounded-xl border border-border bg-black">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className="h-full w-full object-cover"
-            />
-            <div className="absolute bottom-3 left-3 rounded-md bg-black/60 px-2 py-1 text-xs text-white">
-              {displayName}
-            </div>
-          </div>
-        ) : (
+        {/* Persistent video elements — never conditionally unmounted */}
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          muted
+          className={
+            screenSharing && videoOn
+              ? "absolute bottom-8 right-8 z-10 h-32 w-44 rounded-lg border-2 border-border object-cover shadow-lg"
+              : videoOn
+              ? "h-full max-h-[70vh] w-full max-w-2xl rounded-xl border border-border object-cover"
+              : "hidden"
+          }
+        />
+        <video
+          ref={screenVideoRef}
+          autoPlay
+          playsInline
+          className={screenSharing ? "h-full max-h-[70vh] w-full rounded-xl border border-border object-contain" : "hidden"}
+        />
+
+        {!screenSharing && !videoOn && (
           <div className="text-center">
             <div className={`mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full transition-all ${
               isSpeaking ? "bg-discord-green/20 ring-4 ring-discord-green/50" : "bg-secondary"
@@ -244,10 +237,6 @@ export const VoiceChannelView = ({ channelName }: { channelName: string }) => {
             </p>
           </div>
         )}
-
-        {/* Hidden video refs for when not visible */}
-        {!videoOn && <video ref={localVideoRef} className="hidden" />}
-        {!screenSharing && <video ref={screenVideoRef} className="hidden" />}
       </div>
 
       {/* Bottom controls bar */}
