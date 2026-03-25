@@ -66,7 +66,7 @@ const Auth = () => {
       <div className="relative z-10 w-full max-w-[420px]">
         {/* Logo */}
         <div className="mb-6 flex flex-col items-center gap-3">
-          <img src={logoImg} alt="BhosduCord" className="h-16 w-16 drop-shadow-lg" width={64} height={64} />
+          <img src={logoImg} alt="BhosduCord" className="h-24 w-24 drop-shadow-2xl" width={96} height={96} />
           <div className="text-center">
             <h1 className="font-display text-3xl font-extrabold tracking-tight text-foreground">
               {isLogin ? "Welcome back!" : "Create an account"}
