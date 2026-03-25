@@ -439,7 +439,7 @@ const MembersSidebar = ({ serverId, ownerId, statusColor }: { serverId: string; 
               </div>
               <span className="flex-1 truncate text-sm text-foreground">{name}</span>
               {isMemberOwner && (
-                <Crown className="h-3.5 w-3.5 flex-shrink-0 text-discord-yellow" title="Server Owner" />
+                <Crown className="h-3.5 w-3.5 flex-shrink-0 text-discord-yellow" />
               )}
             </div>
           </UserProfilePopup>

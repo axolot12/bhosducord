@@ -10,6 +10,9 @@ import { InviteEmbed, parseMessageContent } from "@/components/InviteEmbed";
 interface ChatAreaProps {
   channelId: string | null;
   channelName: string;
+  showMembersToggle?: boolean;
+  showMembers?: boolean;
+  onToggleMembers?: () => void;
 }
 
 const BASE_URL = window.location.origin;
