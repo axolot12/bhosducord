@@ -1,22 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { Eye, EyeOff, Telescope } from "lucide-react";
-import logoImg from "@/assets/logo.png";
-
-const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+import { useNavigate, useSearchParams } from "react-router-dom";
+...
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/";
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,12 +19,24 @@ const Auth = () => {
           }
           throw error;
         }
-        navigate("/");
+        navigate(redirectTo);
       } else {
-        if (!username.trim()) {
+        const normalizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24);
+        if (!normalizedUsername) {
           toast.error("Username is required");
           setLoading(false);
           return;
+        }
+
+        const { data: usernameMatches, error: usernameCheckError } = await supabase
+          .from("profiles")
+          .select("user_id")
+          .ilike("username", normalizedUsername)
+          .limit(1);
+
+        if (usernameCheckError) throw usernameCheckError;
+        if ((usernameMatches || []).length > 0) {
+          throw new Error("Username is already taken");
         }
 
         const { data, error } = await supabase.auth.signUp({
@@ -45,17 +44,16 @@ const Auth = () => {
           password,
           options: {
             data: {
-              username: username.trim(),
-              display_name: displayName.trim() || username.trim(),
+              username: normalizedUsername,
+              display_name: displayName.trim() || normalizedUsername,
             },
-            emailRedirectTo: window.location.origin,
           },
         });
         if (error) throw error;
 
         if (data.session) {
           toast.success("Account created successfully!");
-          navigate("/");
+          navigate(redirectTo);
           return;
         }
 
@@ -65,8 +63,13 @@ const Auth = () => {
       }
     } catch (error: any) {
       const message = error?.message || "Something went wrong";
-      if (message.toLowerCase().includes("invalid login credentials")) {
+      const lowered = message.toLowerCase();
+      if (lowered.includes("invalid login credentials")) {
         toast.error("Invalid credentials. If you just signed up, verify your email first.");
+      } else if (lowered.includes("user already registered")) {
+        toast.error("This email is already registered. Please log in.");
+      } else if (lowered.includes("redirect url") || lowered.includes("redirect_to")) {
+        toast.error("Login URL is invalid. Please use the app link directly and try again.");
       } else {
         toast.error(message);
       }

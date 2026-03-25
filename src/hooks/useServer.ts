@@ -79,22 +79,19 @@ export const useServers = () => {
   const joinServer = useMutation({
     mutationFn: async (inviteCode: string) => {
       if (!user) throw new Error("Not authenticated");
-      // Find server by invite code
-      const { data: server, error: findError } = await supabase
-        .from("servers")
-        .select("id")
-        .eq("invite_code", inviteCode)
-        .single();
-      if (findError) throw new Error("Invalid invite code");
-      // Join
-      const { error } = await supabase
-        .from("server_members")
-        .insert({ server_id: server.id, user_id: user.id });
+
+      const { data, error } = await supabase.rpc("join_server_by_invite", {
+        _invite_code: inviteCode,
+      });
+
       if (error) {
-        if (error.code === "23505") throw new Error("Already a member");
+        if (error.message?.toLowerCase().includes("invalid invite")) {
+          throw new Error("Invalid invite code");
+        }
         throw error;
       }
-      return server.id;
+
+      return data as string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["servers"] });

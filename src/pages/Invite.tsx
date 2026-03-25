@@ -15,6 +15,7 @@ interface ServerInfo {
   description: string | null;
   member_count: number;
   is_public: boolean;
+  already_member?: boolean;
 }
 
 const Invite = () => {
@@ -28,53 +29,51 @@ const Invite = () => {
 
   useEffect(() => {
     const fetchServer = async () => {
-      if (!code) return;
+      if (!code) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
-        .from("servers")
-        .select("id, name, icon_url, description, member_count, is_public")
-        .eq("invite_code", code)
+        .rpc("get_invite_server", { _invite_code: code })
         .single();
 
       if (error || !data) {
         setServer(null);
+        setAlreadyMember(false);
       } else {
-        setServer(data);
-        // Check membership
-        if (user) {
-          const { data: member } = await supabase
-            .from("server_members")
-            .select("id")
-            .eq("server_id", data.id)
-            .eq("user_id", user.id)
-            .maybeSingle();
-          setAlreadyMember(!!member);
-        }
+        setServer(data as ServerInfo);
+        setAlreadyMember(!!(data as any).already_member);
       }
+
       setLoading(false);
     };
+
     fetchServer();
   }, [code, user]);
 
   const handleJoin = async () => {
     if (!user) {
-      navigate("/auth");
+      navigate(`/auth?redirect=${encodeURIComponent(`/invite/${code || ""}`)}`);
       return;
     }
-    if (!server) return;
+    if (!server || !code) return;
+
     setJoining(true);
     try {
-      const { error } = await supabase
-        .from("server_members")
-        .insert({ server_id: server.id, user_id: user.id });
+      const { error } = await supabase.rpc("join_server_by_invite", { _invite_code: code });
+
       if (error) {
-        if (error.code === "23505") {
-          toast.info("You're already a member!");
+        if (error.message?.toLowerCase().includes("invalid invite")) {
+          toast.error("Invalid invite code");
         } else {
           throw error;
         }
       } else {
         toast.success(`Joined ${server.name}!`);
+        setAlreadyMember(true);
       }
+
       navigate("/");
     } catch (e: any) {
       toast.error(e.message);
