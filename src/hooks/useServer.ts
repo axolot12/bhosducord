@@ -21,6 +21,7 @@ export interface Channel {
   topic: string;
   type: string;
   category: string;
+  category_position: number;
   position: number;
   slow_mode_interval: number;
   is_nsfw: boolean;
@@ -65,7 +66,7 @@ export const useServers = () => {
       if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
         .from("servers")
-        .insert({ name, description: description || "", owner_id: user.id })
+        .insert({ name, description: description || "", owner_id: user.id, is_public: true })
         .select()
         .single();
       if (error) throw error;
@@ -110,6 +111,7 @@ export const useChannels = (serverId: string | null) => {
         .from("channels")
         .select("*")
         .eq("server_id", serverId)
+        .order("category_position", { ascending: true })
         .order("position", { ascending: true });
       if (error) throw error;
       return data as Channel[];
