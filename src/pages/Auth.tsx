@@ -66,6 +66,10 @@ const Auth = () => {
         });
         if (error) throw error;
 
+        if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          throw new Error("This email is already registered. Please log in.");
+        }
+
         if (data.session) {
           toast.success("Account created successfully!");
           navigate(redirectTo);
@@ -81,8 +85,10 @@ const Auth = () => {
       const lowered = message.toLowerCase();
       if (lowered.includes("invalid login credentials")) {
         toast.error("Invalid credentials. If you just signed up, verify your email first.");
-      } else if (lowered.includes("user already registered")) {
+      } else if (lowered.includes("user already registered") || lowered.includes("already been registered")) {
         toast.error("This email is already registered. Please log in.");
+      } else if (lowered.includes("username is already taken") || lowered.includes("profiles_username") || lowered.includes("duplicate key value")) {
+        toast.error("That username is already taken. Try another username.");
       } else if (lowered.includes("redirect url") || lowered.includes("redirect_to")) {
         toast.error("Login URL is invalid. Please use the app link directly and try again.");
       } else {

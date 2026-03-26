@@ -22,7 +22,7 @@ const normalizeUsername = (authUser: User) => {
   const fromMeta = typeof authUser.user_metadata?.username === "string" ? authUser.user_metadata.username : "";
   const fromEmail = authUser.email ? authUser.email.split("@")[0] : "user";
   const base = (fromMeta || fromEmail || "user").toLowerCase().replace(/[^a-z0-9_]/g, "_").slice(0, 24) || "user";
-  return `${base}_${authUser.id.slice(0, 4)}`;
+  return base;
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -43,13 +43,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         (typeof authUser.user_metadata?.display_name === "string" && authUser.user_metadata.display_name.trim()) ||
         (authUser.email ? authUser.email.split("@")[0] : "User");
 
-      await supabase.from("profiles").insert({
+      const normalizedUsername = normalizeUsername(authUser);
+      const baseProfile = {
         user_id: authUser.id,
-        username: normalizeUsername(authUser),
+        username: normalizedUsername,
         display_name: defaultDisplayName,
         email_verified: !!authUser.email_confirmed_at,
         status: status as any,
-      });
+      };
+
+      const { error: createError } = await supabase.from("profiles").insert(baseProfile);
+
+      if (createError?.code === "23505") {
+        await supabase.from("profiles").insert({
+          ...baseProfile,
+          username: `${normalizedUsername.slice(0, 19)}_${authUser.id.slice(0, 4)}`,
+        });
+      }
       return;
     }
 

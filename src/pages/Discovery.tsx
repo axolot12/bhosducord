@@ -16,14 +16,19 @@ const Discovery = () => {
   const [search, setSearch] = useState("");
 
   const { data: servers = [], isLoading } = useQuery({
-    queryKey: ["public-servers"],
+    queryKey: ["public-servers", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("servers")
-        .select("id, name, icon_url, description, member_count, invite_code")
-        .eq("is_public", true)
+        .select("id, name, icon_url, description, member_count, invite_code, is_public, owner_id")
         .order("member_count", { ascending: false })
         .limit(50);
+
+      query = user
+        ? query.or(`is_public.eq.true,owner_id.eq.${user.id}`)
+        : query.eq("is_public", true);
+
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -34,15 +39,21 @@ const Discovery = () => {
     (s.description || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleJoin = async (serverId: string, serverName: string) => {
+  const handleJoin = async (inviteCode: string | null, serverName: string) => {
     if (!user) {
       navigate("/auth");
       return;
     }
+    if (!inviteCode) {
+      toast.error("Invite link unavailable for this server");
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from("server_members")
-        .insert({ server_id: serverId, user_id: user.id });
+      const { error } = await supabase.rpc("join_server_by_invite", {
+        _invite_code: inviteCode,
+      });
+
       if (error) {
         if (error.code === "23505") {
           toast.info("Already a member!");
@@ -127,7 +138,7 @@ const Discovery = () => {
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Users className="h-3 w-3" /> {server.member_count} members
                     </span>
-                    <Button size="sm" onClick={() => handleJoin(server.id, server.name)}>
+                    <Button size="sm" onClick={() => handleJoin(server.invite_code, server.name)}>
                       Join
                     </Button>
                   </div>
