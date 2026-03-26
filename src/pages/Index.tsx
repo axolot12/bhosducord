@@ -148,6 +148,8 @@ const Index = () => {
     else {
       toast.success("Left server");
       handleHome();
+      queryClient.invalidateQueries({ queryKey: ["servers"] });
+      queryClient.invalidateQueries({ queryKey: ["channels", serverId] });
     }
   };
 

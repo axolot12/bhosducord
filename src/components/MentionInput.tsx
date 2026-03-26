@@ -1,16 +1,19 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useServerMembers } from "@/hooks/useServer";
-import { Send, Plus } from "lucide-react";
+import { Send } from "lucide-react";
+import { FileUploadButton } from "@/components/FileUploadButton";
 
 interface MentionInputProps {
   serverId?: string | null;
   channelName: string;
   onSend: (content: string) => void;
   placeholder?: string;
+  /** For DM mention: pass participant profiles directly */
+  dmParticipants?: { user_id: string; display_name?: string | null; username?: string; avatar_url?: string | null }[];
 }
 
-export const MentionInput = ({ serverId, channelName, onSend, placeholder }: MentionInputProps) => {
+export const MentionInput = ({ serverId, channelName, onSend, placeholder, dmParticipants }: MentionInputProps) => {
   const [input, setInput] = useState("");
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
@@ -18,8 +21,16 @@ export const MentionInput = ({ serverId, channelName, onSend, placeholder }: Men
   const inputRef = useRef<HTMLInputElement>(null);
   const { data: members } = useServerMembers(serverId || null);
 
+  // Build mention candidates from server members or DM participants
+  const allCandidates = dmParticipants
+    ? dmParticipants.map((p) => ({
+        id: p.user_id,
+        profiles: { display_name: p.display_name, username: p.username, avatar_url: p.avatar_url },
+      }))
+    : (members || []);
+
   const filteredMembers = mentionQuery !== null
-    ? (members || [])
+    ? allCandidates
         .filter((m: any) => {
           const name = (m.profiles?.display_name || m.profiles?.username || "").toLowerCase();
           return name.includes(mentionQuery.toLowerCase());
@@ -33,7 +44,6 @@ export const MentionInput = ({ serverId, channelName, onSend, placeholder }: Men
     setInput(val);
     setCursorPos(pos);
 
-    // Check if we're in an @mention context
     const textBeforeCursor = val.slice(0, pos);
     const atIndex = textBeforeCursor.lastIndexOf("@");
     if (atIndex !== -1 && (atIndex === 0 || textBeforeCursor[atIndex - 1] === " ")) {
@@ -61,25 +71,10 @@ export const MentionInput = ({ serverId, channelName, onSend, placeholder }: Men
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (mentionQuery !== null && filteredMembers.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setMentionIndex(i => Math.min(i + 1, filteredMembers.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setMentionIndex(i => Math.max(i - 1, 0));
-        return;
-      }
-      if (e.key === "Tab" || e.key === "Enter") {
-        e.preventDefault();
-        insertMention(filteredMembers[mentionIndex]);
-        return;
-      }
-      if (e.key === "Escape") {
-        setMentionQuery(null);
-        return;
-      }
+      if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredMembers.length - 1)); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return; }
+      if (e.key === "Tab" || e.key === "Enter") { e.preventDefault(); insertMention(filteredMembers[mentionIndex]); return; }
+      if (e.key === "Escape") { setMentionQuery(null); return; }
     }
     if (e.key === "Enter" && mentionQuery === null) {
       e.preventDefault();
@@ -90,9 +85,12 @@ export const MentionInput = ({ serverId, channelName, onSend, placeholder }: Men
     }
   };
 
+  const handleFileUploaded = (url: string, fileName: string) => {
+    onSend(`📎 [${fileName}](${url})`);
+  };
+
   return (
     <div className="relative p-4">
-      {/* Mention dropdown */}
       {mentionQuery !== null && filteredMembers.length > 0 && (
         <div className="absolute bottom-full left-4 right-4 mb-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
           {filteredMembers.map((m: any, i: number) => {
@@ -112,9 +110,7 @@ export const MentionInput = ({ serverId, channelName, onSend, placeholder }: Men
                   </AvatarFallback>
                 </Avatar>
                 <span>{name}</span>
-                <span className="text-xs text-muted-foreground">
-                  {m.profiles?.username}
-                </span>
+                <span className="text-xs text-muted-foreground">{m.profiles?.username}</span>
               </button>
             );
           })}
@@ -122,9 +118,7 @@ export const MentionInput = ({ serverId, channelName, onSend, placeholder }: Men
       )}
 
       <div className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2.5">
-        <button type="button" className="text-muted-foreground hover:text-foreground">
-          <Plus className="h-5 w-5" />
-        </button>
+        <FileUploadButton onFileUploaded={handleFileUploaded} />
         <input
           ref={inputRef}
           type="text"
