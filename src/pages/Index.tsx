@@ -35,6 +35,7 @@ const Index = () => {
   const { conversations, createDm } = useDmConversations();
   const { sendFriendRequest } = useFriendships();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [view, setView] = useState<View>("friends");
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
