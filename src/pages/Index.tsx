@@ -4,6 +4,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useServers, useChannels, useServerMembers, type Server, type Channel } from "@/hooks/useServer";
 import { useDmConversations, useFriendships, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy,
@@ -34,6 +35,7 @@ const Index = () => {
   const { conversations, createDm } = useDmConversations();
   const { sendFriendRequest } = useFriendships();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [view, setView] = useState<View>("friends");
   const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
@@ -148,6 +150,8 @@ const Index = () => {
     else {
       toast.success("Left server");
       handleHome();
+      queryClient.invalidateQueries({ queryKey: ["servers"] });
+      queryClient.invalidateQueries({ queryKey: ["channels", serverId] });
     }
   };
 
@@ -457,7 +461,7 @@ const Index = () => {
           onToggleMembers={() => setShowMembers(!showMembers)}
         />
       ) : view === "dm" ? (
-        <DmChatArea conversation={selectedDm} onStartVoiceCall={handleStartDmCall} />
+        <DmChatArea conversation={selectedDm} />
       ) : (
         <FriendsView onOpenDm={handleOpenDm} />
       )}
