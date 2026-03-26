@@ -9,11 +9,12 @@ import { InviteEmbed, parseMessageContent } from "@/components/InviteEmbed";
 
 interface DmChatAreaProps {
   conversation: DmConversation | null;
+  onStartVoiceCall?: () => void;
 }
 
 const BASE_URL = window.location.origin;
 
-export const DmChatArea = ({ conversation }: DmChatAreaProps) => {
+export const DmChatArea = ({ conversation, onStartVoiceCall }: DmChatAreaProps) => {
   const convId = conversation?.id || null;
   const { messages, isLoading, subscribeToDmMessages } = useDmMessages(convId);
   const sendMessage = useSendDmMessage();
@@ -68,10 +69,18 @@ export const DmChatArea = ({ conversation }: DmChatAreaProps) => {
           <span className="font-display font-semibold text-foreground">{displayName}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button className="rounded p-1.5 text-muted-foreground hover:text-foreground" title="Voice Call">
+          <button
+            onClick={onStartVoiceCall}
+            className="rounded p-1.5 text-muted-foreground hover:text-foreground"
+            title="Voice Call"
+          >
             <Phone className="h-4 w-4" />
           </button>
-          <button className="rounded p-1.5 text-muted-foreground hover:text-foreground" title="Video Call">
+          <button
+            onClick={onStartVoiceCall}
+            className="rounded p-1.5 text-muted-foreground hover:text-foreground"
+            title="Video Call"
+          >
             <Video className="h-4 w-4" />
           </button>
         </div>
