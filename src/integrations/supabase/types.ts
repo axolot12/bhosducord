@@ -17,6 +17,7 @@ export type Database = {
       channels: {
         Row: {
           category: string | null
+          category_position: number
           created_at: string
           id: string
           is_nsfw: boolean
@@ -29,6 +30,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          category_position?: number
           created_at?: string
           id?: string
           is_nsfw?: boolean
@@ -41,6 +43,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          category_position?: number
           created_at?: string
           id?: string
           is_nsfw?: boolean
