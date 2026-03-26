@@ -461,7 +461,7 @@ const Index = () => {
           onToggleMembers={() => setShowMembers(!showMembers)}
         />
       ) : view === "dm" ? (
-        <DmChatArea conversation={selectedDm} onStartVoiceCall={handleStartDmCall} />
+        <DmChatArea conversation={selectedDm} />
       ) : (
         <FriendsView onOpenDm={handleOpenDm} />
       )}
