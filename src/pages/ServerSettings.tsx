@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Settings, Hash, Volume2, ImagePlus, Trash2, Plus, Shield, Users
+  ArrowLeft, Settings, Hash, Volume2, ImagePlus, Trash2, Plus, ArrowUp, ArrowDown
 } from "lucide-react";
 
 type Tab = "overview" | "channels";
@@ -51,6 +51,25 @@ const ServerSettings = () => {
   // New channel
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelType, setNewChannelType] = useState<"text" | "voice">("text");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Text Channels");
+
+  const categoryMeta = Array.from(
+    new Map(
+      (channels || [])
+        .slice()
+        .sort((a, b) => ((a.category_position ?? 0) - (b.category_position ?? 0)) || (a.position - b.position))
+        .map((ch: any) => [ch.category || "Uncategorized", ch.category_position ?? 0])
+    ).entries()
+  )
+    .map(([name, position]) => ({ name, position }))
+    .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+
+  useEffect(() => {
+    if (categoryMeta.length > 0 && !categoryMeta.some((c) => c.name === selectedCategory)) {
+      setSelectedCategory(categoryMeta[0].name);
+    }
+  }, [categoryMeta, selectedCategory]);
 
   useEffect(() => {
     if (server && !initialized) {
@@ -116,13 +135,16 @@ const ServerSettings = () => {
 
   const handleCreateChannel = async () => {
     if (!newChannelName.trim()) return;
-    const category = newChannelType === "text" ? "Text Channels" : "Voice Channels";
+    const category = selectedCategory || (newChannelType === "text" ? "Text Channels" : "Voice Channels");
+    const sameCategory = (channels || []).filter((ch: any) => ch.category === category);
+    const categoryPosition = sameCategory[0]?.category_position ?? (Math.max(-1, ...(channels || []).map((ch: any) => ch.category_position ?? 0)) + 1);
     const { error } = await supabase.from("channels").insert({
       server_id: server.id,
       name: newChannelName.trim().toLowerCase().replace(/\s+/g, "-"),
       type: newChannelType,
       category,
-      position: (channels?.length || 0),
+      category_position: categoryPosition,
+      position: sameCategory.length,
     });
     if (error) toast.error("Failed to create channel");
     else {
@@ -130,6 +152,86 @@ const ServerSettings = () => {
       setNewChannelName("");
       queryClient.invalidateQueries({ queryKey: ["channels", serverId] });
     }
+  };
+
+  const handleCreateCategory = async () => {
+    const category = newCategoryName.trim();
+    if (!category) return;
+    if (categoryMeta.some((c) => c.name.toLowerCase() === category.toLowerCase())) {
+      toast.error("Category already exists");
+      return;
+    }
+
+    const nextCategoryPosition = Math.max(-1, ...categoryMeta.map((c) => c.position)) + 1;
+    const starterName = category.toLowerCase().replace(/[^a-z0-9-\s]/g, "").trim().replace(/\s+/g, "-") || "channel";
+
+    const { error } = await supabase.from("channels").insert({
+      server_id: server.id,
+      name: starterName,
+      type: "text",
+      category,
+      category_position: nextCategoryPosition,
+      position: 0,
+    });
+
+    if (error) {
+      toast.error("Failed to create category");
+      return;
+    }
+
+    toast.success("Category created");
+    setSelectedCategory(category);
+    setNewCategoryName("");
+    queryClient.invalidateQueries({ queryKey: ["channels", serverId] });
+  };
+
+  const handleMoveCategory = async (category: string, direction: -1 | 1) => {
+    const idx = categoryMeta.findIndex((c) => c.name === category);
+    const targetIdx = idx + direction;
+    if (idx < 0 || targetIdx < 0 || targetIdx >= categoryMeta.length) return;
+
+    const current = categoryMeta[idx];
+    const target = categoryMeta[targetIdx];
+
+    const [first, second] = await Promise.all([
+      supabase.from("channels").update({ category_position: target.position }).eq("server_id", server.id).eq("category", current.name),
+      supabase.from("channels").update({ category_position: current.position }).eq("server_id", server.id).eq("category", target.name),
+    ]);
+
+    if (first.error || second.error) {
+      toast.error("Failed to reorder categories");
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["channels", serverId] });
+  };
+
+  const handleMoveChannel = async (channelId: string, direction: -1 | 1) => {
+    const channel = (channels || []).find((ch: any) => ch.id === channelId);
+    if (!channel) return;
+
+    const list = (channels || [])
+      .filter((ch: any) => ch.category === channel.category)
+      .slice()
+      .sort((a: any, b: any) => a.position - b.position);
+
+    const idx = list.findIndex((ch: any) => ch.id === channelId);
+    const targetIdx = idx + direction;
+    if (idx < 0 || targetIdx < 0 || targetIdx >= list.length) return;
+
+    const target = list[targetIdx];
+
+    const [first, second] = await Promise.all([
+      supabase.from("channels").update({ position: target.position }).eq("id", channel.id),
+      supabase.from("channels").update({ position: channel.position }).eq("id", target.id),
+    ]);
+
+    if (first.error || second.error) {
+      toast.error("Failed to reorder channels");
+      return;
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["channels", serverId] });
   };
 
   const handleDeleteChannel = async (channelId: string) => {
@@ -286,35 +388,103 @@ const ServerSettings = () => {
                     <option value="text">Text</option>
                     <option value="voice">Voice</option>
                   </select>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="rounded-md bg-secondary px-3 text-sm text-foreground"
+                  >
+                    {categoryMeta.map((cat) => (
+                      <option key={cat.name} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
                   <Button onClick={handleCreateChannel} size="sm">
                     <Plus className="mr-1 h-4 w-4" /> Create
                   </Button>
                 </div>
               </div>
 
+              <div className="mb-6 rounded-lg bg-card p-4">
+                <h3 className="mb-3 text-sm font-bold text-foreground">Create Category</h3>
+                <div className="flex gap-2">
+                  <Input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Category name"
+                    className="flex-1 bg-secondary text-foreground"
+                  />
+                  <Button onClick={handleCreateCategory} size="sm">Add</Button>
+                </div>
+              </div>
+
               {/* Channel list */}
-              <div className="space-y-2">
-                {(channels || []).map((ch) => (
-                  <div key={ch.id} className="flex items-center justify-between rounded-lg bg-card p-3">
-                    <div className="flex items-center gap-2">
-                      {ch.type === "voice" ? (
-                        <Volume2 className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Hash className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm text-foreground">{ch.name}</span>
-                      <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                        {ch.type}
-                      </span>
+              <div className="space-y-4">
+                {categoryMeta.map((category, categoryIndex) => {
+                  const categoryChannels = (channels || [])
+                    .filter((ch: any) => ch.category === category.name)
+                    .slice()
+                    .sort((a: any, b: any) => a.position - b.position);
+
+                  return (
+                    <div key={category.name} className="rounded-lg bg-card p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase text-muted-foreground">{category.name}</p>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleMoveCategory(category.name, -1)}
+                            disabled={categoryIndex === 0}
+                            className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleMoveCategory(category.name, 1)}
+                            disabled={categoryIndex === categoryMeta.length - 1}
+                            className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        {categoryChannels.map((ch: any, index: number) => (
+                          <div key={ch.id} className="flex items-center justify-between rounded-md bg-secondary/40 p-2">
+                            <div className="flex items-center gap-2">
+                              {ch.type === "voice" ? (
+                                <Volume2 className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Hash className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span className="text-sm text-foreground">{ch.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleMoveChannel(ch.id, -1)}
+                                disabled={index === 0}
+                                className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                              >
+                                <ArrowUp className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleMoveChannel(ch.id, 1)}
+                                disabled={index === categoryChannels.length - 1}
+                                className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                              >
+                                <ArrowDown className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteChannel(ch.id)}
+                                className="rounded p-1 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteChannel(ch.id)}
-                      className="rounded p-1 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
