@@ -40,7 +40,7 @@ const Index = () => {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [selectedDm, setSelectedDm] = useState<DmConversation | null>(null);
   const [showServerDialog, setShowServerDialog] = useState(false);
-  const [voiceChannel, setVoiceChannel] = useState<{ id: string; name: string } | null>(null);
+  const [voiceChannel, setVoiceChannel] = useState<{ id: string; name: string; type: "server" | "dm" } | null>(null);
   const [showMembers, setShowMembers] = useState(true);
 
   const { data: channels } = useChannels(selectedServerId);
@@ -79,7 +79,15 @@ const Index = () => {
   };
 
   const handleJoinVoice = (ch: Channel) => {
-    setVoiceChannel({ id: ch.id, name: ch.name });
+    setVoiceChannel({ id: ch.id, name: ch.name, type: "server" });
+    setView("voice");
+  };
+
+  const handleStartDmCall = () => {
+    if (!selectedDm) return;
+    const other = selectedDm.participants?.[0]?.profiles;
+    const targetName = other?.display_name || other?.username || "User";
+    setVoiceChannel({ id: selectedDm.id, name: `Call with ${targetName}`, type: "dm" });
     setView("voice");
   };
 
@@ -323,7 +331,7 @@ const Index = () => {
                           <Volume2 className="h-4 w-4 flex-shrink-0" />
                           {ch.name}
                         </button>
-                        {voiceChannel?.id === ch.id && (
+                        {voiceChannel?.type === "server" && voiceChannel.id === ch.id && (
                           <div className="ml-6 space-y-0.5 py-0.5">
                             <div className="flex items-center gap-1.5 rounded px-1.5 py-0.5">
                               <Avatar className="h-5 w-5">
@@ -413,7 +421,11 @@ const Index = () => {
         {voiceChannel && (
           <VoiceControls
             channelName={voiceChannel.name}
-            onDisconnect={() => { setVoiceChannel(null); if (view === "voice") setView("server"); }}
+            onDisconnect={() => {
+              const returnView = voiceChannel.type === "dm" ? "dm" : "server";
+              setVoiceChannel(null);
+              if (view === "voice") setView(returnView);
+            }}
           />
         )}
 
@@ -445,7 +457,7 @@ const Index = () => {
           onToggleMembers={() => setShowMembers(!showMembers)}
         />
       ) : view === "dm" ? (
-        <DmChatArea conversation={selectedDm} />
+        <DmChatArea conversation={selectedDm} onStartVoiceCall={handleStartDmCall} />
       ) : (
         <FriendsView onOpenDm={handleOpenDm} />
       )}
