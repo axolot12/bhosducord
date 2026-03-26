@@ -4,6 +4,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useServers, useChannels, useServerMembers, type Server, type Channel } from "@/hooks/useServer";
 import { useDmConversations, useFriendships, type DmConversation } from "@/hooks/useFriends";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Hash, Volume2, Settings, Plus, ChevronDown, Users, Compass, Copy,
